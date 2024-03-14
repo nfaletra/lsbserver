@@ -2,12 +2,11 @@
 -- Area: Navukgo Execution Chamber
 --  Mob: Immortal Flan
 -----------------------------------
-require("scripts/globals/battlefield")
-local ID = require("scripts/zones/Navukgo_Execution_Chamber/IDs")
+local ID = zones[xi.zone.NAVUKGO_EXECUTION_CHAMBER]
 -----------------------------------
 local entity = {}
 
-entity.onMobEngaged = function(mob, target)
+entity.onMobEngage = function(mob, target)
     local bf = mob:getBattlefield()
     local mobOffset = (bf:getArea() - 1) * 7
     if bf:getLocalVar('flans_spawned') ~= 1 then

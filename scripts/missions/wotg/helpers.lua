@@ -1,12 +1,6 @@
 -----------------------------------
 -- Wings of the Goddess Helpers
 -----------------------------------
-require('scripts/globals/missions')
-require('scripts/globals/npc_util')
-require('scripts/globals/quests')
-require('scripts/globals/zone')
------------------------------------
-
 xi = xi or {}
 xi.wotg = xi.wotg or {}
 xi.wotg.helpers = xi.wotg.helpers or {}
@@ -89,7 +83,7 @@ xi.wotg.helpers.helmTrade = function(player, helmType, broke)
     local zoneId = player:getZoneID()
 
     if
-        helmType == xi.helm.type.LOGGING and
+        helmType == xi.helmType.LOGGING and
         broke ~= 1 and
         math.random(1, 100) < wotgChance
     then

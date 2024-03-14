@@ -22,7 +22,8 @@
 #ifndef _TASK_MGR_H
 #define _TASK_MGR_H
 
-#include "common/cbasetypes.h"
+#include "cbasetypes.h"
+#include "singleton.h"
 
 #include <any>
 #include <functional>
@@ -38,10 +39,11 @@ struct greater_equal
     }
 };
 
-class CTaskMgr
+class CTaskMgr : public Singleton<CTaskMgr>
 {
 public:
     class CTask;
+    ~CTaskMgr();
     enum TASKTYPE
     {
         TASK_INTERVAL,
@@ -58,22 +60,16 @@ public:
     };
 
     CTask* AddTask(CTask*);
-    CTask* AddTask(std::string InitName, time_point InitTick, std::any InitData, TASKTYPE InitType, TaskFunc_t InitFunc, duration InitInterval = 1s);
+    CTask* AddTask(std::string const& InitName, time_point InitTick, std::any InitData, TASKTYPE InitType, TaskFunc_t InitFunc, duration InitInterval = 1s);
 
     duration DoTimer(time_point tick);
     void     RemoveTask(std::string const& TaskName);
 
-    static CTaskMgr* getInstance();
-    static void      delInstance();
-
-    ~CTaskMgr(){};
+protected:
+    CTaskMgr() = default;
 
 private:
-    static CTaskMgr* _instance;
-
     TaskList_t m_TaskList;
-
-    CTaskMgr(){};
 };
 
 class CTaskMgr::CTask

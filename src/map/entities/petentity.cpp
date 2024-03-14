@@ -21,21 +21,21 @@
 
 #include <cstring>
 
-#include "../ai/ai_container.h"
-#include "../ai/controllers/pet_controller.h"
-#include "../ai/helpers/pathfind.h"
-#include "../ai/helpers/targetfind.h"
-#include "../ai/states/ability_state.h"
-#include "../ai/states/petskill_state.h"
-#include "../mob_modifier.h"
-#include "../mob_spell_container.h"
-#include "../mob_spell_list.h"
-#include "../packets/entity_update.h"
-#include "../packets/pet_sync.h"
-#include "../status_effect_container.h"
-#include "../utils/battleutils.h"
-#include "../utils/mobutils.h"
-#include "../utils/petutils.h"
+#include "ai/ai_container.h"
+#include "ai/controllers/pet_controller.h"
+#include "ai/helpers/pathfind.h"
+#include "ai/helpers/targetfind.h"
+#include "ai/states/ability_state.h"
+#include "ai/states/petskill_state.h"
+#include "mob_modifier.h"
+#include "mob_spell_container.h"
+#include "mob_spell_list.h"
+#include "packets/entity_update.h"
+#include "packets/pet_sync.h"
+#include "status_effect_container.h"
+#include "utils/battleutils.h"
+#include "utils/mobutils.h"
+#include "utils/petutils.h"
 
 #include "common/utils.h"
 #include "petentity.h"
@@ -317,7 +317,7 @@ void CPetEntity::OnAbility(CAbilityState& state, action_t& action)
     auto* PTarget  = static_cast<CBattleEntity*>(state.GetTarget());
 
     std::unique_ptr<CBasicPacket> errMsg;
-    if (IsValidTarget(PTarget->targid, PAbility->getValidTarget(), errMsg))
+    if (PTarget && IsValidTarget(PTarget->targid, PAbility->getValidTarget(), errMsg))
     {
         if (this != PTarget && distance(this->loc.p, PTarget->loc.p) > PAbility->getRange())
         {
@@ -361,6 +361,18 @@ void CPetEntity::OnAbility(CAbilityState& state, action_t& action)
             actionTarget.param     = -value;
         }
     }
+    else // Can't target anything, just cancel the animation.
+    {
+        action.actiontype         = ACTION_MOBABILITY_INTERRUPT;
+        action.actionid           = 28787; // Some hardcoded magic for interrupts
+        actionList_t& actionList  = action.getNewActionList();
+        actionList.ActionTargetID = id;
+
+        actionTarget_t& actionTarget = actionList.getNewActionTarget();
+        actionTarget.animation       = 0x1FC;
+        actionTarget.messageID       = 0;
+        actionTarget.reaction        = REACTION::ABILITY | REACTION::HIT;
+    }
 }
 
 bool CPetEntity::ValidTarget(CBattleEntity* PInitiator, uint16 targetFlags)
@@ -370,6 +382,23 @@ bool CPetEntity::ValidTarget(CBattleEntity* PInitiator, uint16 targetFlags)
         return false;
     }
     return CMobEntity::ValidTarget(PInitiator, targetFlags);
+}
+
+bool CPetEntity::CanAttack(CBattleEntity* PTarget, std::unique_ptr<CBasicPacket>& errMsg)
+{
+    // prevent pets from attacking mobs that the PC master does not own
+    if (this->PMaster)
+    {
+        auto* PChar = dynamic_cast<CCharEntity*>(this->PMaster);
+        if (PChar && !PChar->IsMobOwner(PTarget))
+        {
+            errMsg = std::make_unique<CMessageBasicPacket>(this, PTarget, 0, 0, MSGBASIC_ALREADY_CLAIMED);
+            PAI->Disengage();
+            return false;
+        }
+    }
+
+    return CBattleEntity::CanAttack(PTarget, errMsg);
 }
 
 void CPetEntity::OnPetSkillFinished(CPetSkillState& state, action_t& action)
@@ -405,6 +434,11 @@ void CPetEntity::OnPetSkillFinished(CPetSkillState& state, action_t& action)
     if ((PSkill->getValidTargets() & TARGET_IGNORE_BATTLEID) == TARGET_IGNORE_BATTLEID)
     {
         findFlags |= FINDFLAGS_IGNORE_BATTLEID;
+    }
+
+    if ((PSkill->getValidTargets() & TARGET_PLAYER_DEAD) == TARGET_PLAYER_DEAD)
+    {
+        findFlags |= FINDFLAGS_DEAD;
     }
 
     action.id         = id;

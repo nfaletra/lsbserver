@@ -19,8 +19,8 @@
 ===========================================================================
 */
 
-#include "../common/logging.h"
-#include "../common/timer.h"
+#include "common/logging.h"
+#include "common/timer.h"
 
 #include "alliance.h"
 #include "entities/battleentity.h"
@@ -62,15 +62,15 @@ struct CParty::partyInfo_t
 
 // Constructor
 CParty::CParty(CBattleEntity* PEntity)
+: m_PartyID(0)
+, m_PartyType(PARTY_MOBS)
+, m_PartyNumber(0)
 {
     m_PLeader        = nullptr;
     m_PAlliance      = nullptr;
     m_PSyncTarget    = nullptr;
     m_PQuarterMaster = nullptr;
     m_EffectsChanged = false;
-    m_PartyID        = 0;
-    m_PartyType      = PARTY_MOBS;
-    m_PartyNumber    = 0;
 
     if (PEntity != nullptr && PEntity->PParty == nullptr)
     {
@@ -82,23 +82,32 @@ CParty::CParty(CBattleEntity* PEntity)
     }
     else
     {
-        ShowWarning("CParty::CParty() - PEntity was null, or party was not null.")
+        ShowWarning("CParty::CParty() - PEntity was null, or party was not null.");
     }
 }
 
 CParty::CParty(uint32 id)
+: m_PartyID(id)
+, m_PartyType(PARTY_PCS)
+, m_PartyNumber(0)
 {
     m_PAlliance = nullptr;
-
-    m_PartyID     = id;
-    m_PartyType   = PARTY_PCS;
-    m_PartyNumber = 0;
 
     m_PLeader        = nullptr;
     m_PSyncTarget    = nullptr;
     m_PQuarterMaster = nullptr;
 
     m_EffectsChanged = false;
+}
+
+// Dirty, ugly hack to prevent bad refs keeping garbage pointers in memory pointing to things that _could_ still be valid, causing mayhem
+CParty::~CParty()
+{
+    m_PLeader        = nullptr;
+    m_PartyID        = 0;
+    m_PAlliance      = nullptr;
+    m_PSyncTarget    = nullptr;
+    m_PQuarterMaster = nullptr;
 }
 
 void CParty::DisbandParty(bool playerInitiated)
@@ -108,13 +117,12 @@ void CParty::DisbandParty(bool playerInitiated)
         m_PAlliance->removeParty(this);
     }
     m_PSyncTarget = nullptr;
-    SetQuarterMaster("");
-
-    m_PLeader   = nullptr;
-    m_PAlliance = nullptr;
+    m_PLeader     = nullptr;
+    m_PAlliance   = nullptr;
 
     if (m_PartyType == PARTY_PCS)
     {
+        SetQuarterMaster("");
         PushPacket(0, 0, new CPartyDefinePacket(nullptr));
 
         for (auto& member : members)
@@ -150,9 +158,8 @@ void CParty::DisbandParty(bool playerInitiated)
         // make sure chat server isn't notified of a disband if this came from the chat server already
         if (playerInitiated)
         {
-            uint8 data[8]{};
+            uint8 data[4]{};
             ref<uint32>(data, 0) = m_PartyID;
-            ref<uint32>(data, 4) = m_PartyID;
             message::send(MSG_PT_DISBAND, data, sizeof data, nullptr);
         }
     }
@@ -207,8 +214,16 @@ void CParty::AssignPartyRole(const std::string& MemberName, uint8 role)
             break;
     }
     uint8 data[4]{};
-    ref<uint32>(data, 0) = m_PartyID;
-    message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+    if (m_PAlliance)
+    {
+        ref<uint32>(data, 0) = m_PAlliance->m_AllianceID;
+        message::send(MSG_ALLIANCE_RELOAD, data, sizeof data, nullptr);
+    }
+    else
+    {
+        ref<uint32>(data, 0) = m_PartyID;
+        message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+    }
 }
 
 // get number of members in specified zone
@@ -252,7 +267,7 @@ CBattleEntity* CParty::GetMemberByName(const std::string& memberName)
 
     for (auto& member : members)
     {
-        if (strcmpi(memberName.c_str(), member->GetName().c_str()) == 0)
+        if (strcmpi(memberName.c_str(), member->getName().c_str()) == 0)
         {
             return member;
         }
@@ -329,8 +344,16 @@ void CParty::RemoveMember(CBattleEntity* PEntity)
                 sql->Query("DELETE FROM accounts_parties WHERE charid = %u;", PChar->id);
 
                 uint8 data[4]{};
-                ref<uint32>(data, 0) = m_PartyID;
-                message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+                if (m_PAlliance)
+                {
+                    ref<uint32>(data, 0) = m_PAlliance->m_AllianceID;
+                    message::send(MSG_ALLIANCE_RELOAD, data, sizeof data, nullptr);
+                }
+                else
+                {
+                    ref<uint32>(data, 0) = m_PartyID;
+                    message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+                }
 
                 if (PChar->PTreasurePool != nullptr && PChar->PTreasurePool->GetPoolType() != TREASUREPOOL_ZONE)
                 {
@@ -515,9 +538,9 @@ std::vector<CParty::partyInfo_t> CParty::GetPartyInfo() const
     {
         while (sql->NextRow() == SQL_SUCCESS)
         {
-            memberinfo.push_back({ sql->GetUIntData(0), sql->GetUIntData(1), sql->GetUIntData(2),
-                                   std::string((const char*)sql->GetData(3)), static_cast<uint16>(sql->GetUIntData(4)),
-                                   static_cast<uint16>(sql->GetUIntData(5)), static_cast<uint16>(sql->GetUIntData(6)) });
+            memberinfo.emplace_back(CParty::partyInfo_t{ sql->GetUIntData(0), sql->GetUIntData(1), sql->GetUIntData(2),
+                                                         std::string((const char*)sql->GetData(3)), static_cast<uint16>(sql->GetUIntData(4)),
+                                                         static_cast<uint16>(sql->GetUIntData(5)), static_cast<uint16>(sql->GetUIntData(6)) });
         }
     }
     return memberinfo;
@@ -544,7 +567,7 @@ void CParty::AddMember(CBattleEntity* PEntity)
     }
 
     PEntity->PParty = this;
-    members.push_back(PEntity);
+    members.emplace_back(PEntity);
 
     if (PEntity->objtype == TYPE_PC && this->members.size() > 1)
     {
@@ -560,7 +583,7 @@ void CParty::AddMember(CBattleEntity* PEntity)
     {
         if (PEntity->objtype != TYPE_PC)
         {
-            ShowWarning("Non-Player passed into function (%s).", PEntity->GetName());
+            ShowWarning("Non-Player passed into function (%s).", PEntity->getName());
             return;
         }
 
@@ -575,8 +598,17 @@ void CParty::AddMember(CBattleEntity* PEntity)
         sql->Query("INSERT INTO accounts_parties (charid, partyid, allianceid, partyflag) VALUES (%u, %u, %u, %u);", PChar->id, m_PartyID, allianceid,
                    GetMemberFlags(PChar));
         uint8 data[4]{};
-        ref<uint32>(data, 0) = m_PartyID;
-        message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+        if (m_PAlliance)
+        {
+            ref<uint32>(data, 0) = m_PAlliance->m_AllianceID;
+            message::send(MSG_ALLIANCE_RELOAD, data, sizeof data, nullptr);
+        }
+        else
+        {
+            ref<uint32>(data, 0) = m_PartyID;
+            message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+        }
+
         ReloadTreasurePool(PChar);
 
         if (PChar->nameflags.flags & FLAG_INVITE)
@@ -637,10 +669,17 @@ void CParty::AddMember(uint32 id)
         }
         sql->Query("INSERT INTO accounts_parties (charid, partyid, allianceid, partyflag) VALUES (%u, %u, %u, %u);", id, m_PartyID, allianceid,
                    Flags);
-        uint8 data[8]{};
-        ref<uint32>(data, 0) = m_PartyID;
-        ref<uint32>(data, 4) = id;
-        message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+        uint8 data[4]{};
+        if (m_PAlliance)
+        {
+            ref<uint32>(data, 0) = m_PAlliance->m_AllianceID;
+            message::send(MSG_ALLIANCE_RELOAD, data, sizeof data, nullptr);
+        }
+        else
+        {
+            ref<uint32>(data, 0) = m_PartyID;
+            message::send(MSG_PT_RELOAD, data, sizeof data, nullptr);
+        }
 
         /*if (PChar->nameflags.flags & FLAG_INVITE)
         {
@@ -667,7 +706,7 @@ void CParty::PushMember(CBattleEntity* PEntity)
     }
 
     PEntity->PParty = this;
-    members.push_back(PEntity);
+    members.emplace_back(PEntity);
 
     auto info = GetPartyInfo();
 
@@ -962,7 +1001,7 @@ void CParty::SetLeader(const std::string& MemberName)
     {
         uint32 newId = 0;
         int    ret   = sql->Query(
-                 "SELECT chars.charid from accounts_sessions JOIN chars ON chars.charid = accounts_sessions.charid WHERE charname = ('%s')", MemberName);
+            "SELECT chars.charid from accounts_sessions JOIN chars ON chars.charid = accounts_sessions.charid WHERE charname = ('%s')", MemberName);
 
         if (ret != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
         {
@@ -1090,6 +1129,7 @@ void CParty::SetSyncTarget(const std::string& MemberName, uint16 message)
     }
 }
 
+// FIXME: add case for "" membername
 void CParty::SetQuarterMaster(const std::string& MemberName)
 {
     CBattleEntity* PEntity = GetMemberByName(MemberName);
@@ -1207,6 +1247,7 @@ void CParty::RefreshSync()
             charutils::CalculateStats(member);
             charutils::BuildingCharTraitsTable(member);
             charutils::BuildingCharAbilityTable(member);
+            charutils::BuildingCharWeaponSkills(member);
             charutils::CheckValidEquipment(member);
             member->pushPacket(new CCharAbilitiesPacket(member));
         }
@@ -1282,6 +1323,11 @@ bool CParty::HasTrusts()
 
 void CParty::RefreshFlags(std::vector<partyInfo_t>& info)
 {
+    // Clear pointers in case they no longer exist on this instance
+    m_PLeader        = nullptr;
+    m_PQuarterMaster = nullptr;
+    m_PSyncTarget    = nullptr;
+
     for (auto&& memberinfo : info)
     {
         if (memberinfo.partyid == m_PartyID)

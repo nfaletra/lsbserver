@@ -25,6 +25,7 @@ global_objects=(
     ai
     os
     _
+    _G
 
     Module
     Override
@@ -44,17 +45,12 @@ global_objects=(
     set
     printf
     switch
-    clearVarFromAll
     getVanaMidnight
     getMidnight
-    getConquestTally
 
-    mission
     Mission
-    quest
     Quest
     HiddenQuest
-    fileExists
     InteractionGlobal
     InteractionLookup
     Action
@@ -78,39 +74,7 @@ global_objects=(
     QUEST_COMPLETED
 
     onBattlefieldHandlerInitialise
-
-    doAutoPhysicalWeaponskill
-    doAutoRangedWeaponskill
-    doPhysicalWeaponskill
-    doRangedWeaponskill
-    doMagicWeaponskill
-    doesElementMatchWeaponskill
     applyResistanceAddEffect
-    takeWeaponskillDamage
-
-    fTP
-    fSTR
-    fSTR2
-    calculateRawWSDmg
-    calculatedIgnoredDef
-    cMeleeRatio
-    generatePdif
-    getMeleeDmg
-    handleWSGorgetBelt
-
-    RoeParseTimed
-    getRoeRecords
-    RoeParseRecords
-
-    cmdprops
-    error
-    onTrigger
-
-    SetExplorerMoogles
-
-    applyHalloweenNpcCostumes
-    isHalloweenEnabled
-    onHalloweenTrade
 
     addBonuses
     addBonusesAbility
@@ -119,9 +83,7 @@ global_objects=(
     applyResistanceEffect
     adjustForTarget
     calculateDuration
-    calculateDurationForLvl
     calculateMagicDamage
-    calculatePotency
     canOverwrite
     doEnspell
     finalMagicAdjustments
@@ -132,56 +94,10 @@ global_objects=(
     getCureFinal
     getBaseCureOld
     getElementalDamageReduction
-    getElementalDebuffDOT
-    getFlourishAnimation
-    getHelixDuration
-    getHitRate
     getMagicHitRate
     getMagicResist
-    getStepAnimation
-    getElementalDebuffStatDownFromDOT
-    handleAfflatusMisery
-    handleNinjutsuDebuff
     handleThrenody
     isValidHealTarget
-    takeAbilityDamage
-
-    FormMagicBurst
-    MobFormMagicBurst
-
-    AbilityFinalAdjustments
-
-    TPMOD_NONE
-    TPMOD_CHANCE
-    TPMOD_CRITICAL
-    TPMOD_DAMAGE
-    TPMOD_ACC
-    TPMOD_ATTACK
-    TPMOD_DURATION
-    SC_NONE
-    SC_IMPACTION
-    SC_TRANSFIXION
-    SC_DETONATION
-    SC_REVERBERATION
-    SC_SCISSION
-    SC_INDURATION
-    SC_LIQUEFACTION
-    SC_COMPRESSION
-    SC_FUSION
-    SC_FRAGMENTATION
-    SC_DISTORTION
-    SC_GRAVITATION
-    SC_DARKNESS
-    SC_LIGHT
-    SC_LIGHT_II
-    SC_DARKNESS_II
-    INT_BASED
-    CHR_BASED
-    MND_BASED
-    BluePhysicalSpell
-    BlueMagicalSpell
-    BlueFinalAdjustments
-    getBlueEffectDuration
 
     ForceCrash
     BuildString
@@ -190,7 +106,6 @@ global_objects=(
 )
 
 ignores=(
-    "unused variable ID"
 )
 
 ignore_rules=(
@@ -207,4 +122,3 @@ ignore_rules=(
 --ignore ${ignores[@]} ${ignore_rules[@]} | grep -v "Total:"
 
 python3 ./tools/ci/lua_stylecheck.py ${target}
-

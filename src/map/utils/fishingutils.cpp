@@ -24,37 +24,39 @@
 #include <cmath>
 #include <cstring>
 
-#include "../packets/caught_fish.h"
-#include "../packets/caught_monster.h"
-#include "../packets/char_skills.h"
-#include "../packets/char_sync.h"
-#include "../packets/char_update.h"
-#include "../packets/chat_message.h"
-#include "../packets/entity_animation.h"
-#include "../packets/event.h"
-#include "../packets/fishing.h"
-#include "../packets/inventory_finish.h"
-#include "../packets/inventory_item.h"
-#include "../packets/message_special.h"
-#include "../packets/message_system.h"
-#include "../packets/message_text.h"
-#include "../packets/release.h"
+#include "packets/caught_fish.h"
+#include "packets/caught_monster.h"
+#include "packets/char_skills.h"
+#include "packets/char_sync.h"
+#include "packets/char_update.h"
+#include "packets/chat_message.h"
+#include "packets/entity_animation.h"
+#include "packets/event.h"
+#include "packets/fishing.h"
+#include "packets/inventory_finish.h"
+#include "packets/inventory_item.h"
+#include "packets/message_special.h"
+#include "packets/message_standard.h"
+#include "packets/message_system.h"
+#include "packets/message_text.h"
+#include "packets/release.h"
 
-#include "../entities/battleentity.h"
-#include "../entities/mobentity.h"
-#include "../entities/npcentity.h"
+#include "entities/battleentity.h"
+#include "entities/mobentity.h"
+#include "entities/npcentity.h"
 
-#include "../ai/ai_container.h"
+#include "ai/ai_container.h"
 
-#include "../enmity_container.h"
-#include "../item_container.h"
-#include "../mob_modifier.h"
-#include "../status_effect_container.h"
-#include "../trade_container.h"
-#include "../universal_container.h"
+#include "enmity_container.h"
+#include "item_container.h"
+#include "mob_modifier.h"
+#include "status_effect_container.h"
+#include "trade_container.h"
+#include "universal_container.h"
 
 #include "battleutils.h"
 #include "charutils.h"
+#include "common/vana_time.h"
 #include "itemutils.h"
 #include "zoneutils.h"
 
@@ -1075,9 +1077,7 @@ namespace fishingutils
 
     uint8 GetFishingSkill(CCharEntity* PChar)
     {
-        uint8 rawSkill = (uint8)std::min(100, (int)std::floor(PChar->RealSkills.skill[SKILL_FISHING] / 10));
-
-        return rawSkill + PChar->getMod(Mod::FISH);
+        return static_cast<uint8>(std::floor(PChar->RealSkills.skill[SKILL_FISHING] / 10) + PChar->getMod(Mod::FISH));
     }
 
     uint8 GetBaitPower(bait_t* bait, fish_t* fish)
@@ -1115,7 +1115,7 @@ namespace fishingutils
         {
             if (FishList[fish.first]->item)
             {
-                pool.push_back(FishList[fish.first]);
+                pool.emplace_back(FishList[fish.first]);
             }
         }
 
@@ -1132,7 +1132,7 @@ namespace fishingutils
             {
                 if (!mob.second->questOnly)
                 {
-                    pool.push_back(mob.second);
+                    pool.emplace_back(mob.second);
                 }
             }
         }
@@ -1851,7 +1851,7 @@ namespace fishingutils
 
         // Not in City bonus
         CZone* PZone = zoneutils::GetZone(PChar->getZone());
-        if (PZone && PZone->GetType() > ZONE_TYPE::CITY)
+        if (!(PZone && PZone->GetTypeMask() & ZONE_TYPE::CITY))
         {
             skillRoll -= 10;
         }
@@ -1973,7 +1973,7 @@ namespace fishingutils
             if (PChar->animation != ANIMATION_NONE)
             {
                 PChar->pushPacket(new CMessageTextPacket(PChar, MessageOffset + FISHMESSAGEOFFSET_CANNOTFISH_MOMENT));
-                PChar->pushPacket(new CMessageSystemPacket(0, 0, 142));
+                PChar->pushPacket(new CMessageSystemPacket(0, 0, MsgStd::CannotUseCommandAtTheMoment));
                 PChar->pushPacket(new CReleasePacket(PChar, RELEASE_TYPE::FISHING));
 
                 return;
@@ -2011,13 +2011,13 @@ namespace fishingutils
             }
             else
             {
-                PChar->pushPacket(new CMessageSystemPacket(0, 0, 142));
+                PChar->pushPacket(new CMessageSystemPacket(0, 0, MsgStd::CannotUseCommandAtTheMoment));
                 PChar->pushPacket(new CReleasePacket(PChar, RELEASE_TYPE::FISHING));
             }
         }
         else
         {
-            PChar->pushPacket(new CMessageSystemPacket(0, 0, 142));
+            PChar->pushPacket(new CMessageSystemPacket(0, 0, MsgStd::CannotUseCommandAtTheMoment));
             PChar->pushPacket(new CReleasePacket(PChar, RELEASE_TYPE::FISHING));
 
             return;
@@ -2124,7 +2124,7 @@ namespace fishingutils
         float  noCatchMoonModifier  = MOONPATTERN_5(GetMoonPhase());
 
         CZone* PZone = zoneutils::GetZone(PChar->getZone());
-        if (PZone && PZone->GetType() <= ZONE_TYPE::CITY)
+        if (PZone && PZone->GetTypeMask() & ZONE_TYPE::CITY)
         {
             FishPoolWeight = (uint16)std::floor(15 * fishPoolMoonModifier);
             ItemPoolWeight = 25 + (uint16)std::floor(20 * itemPoolMoonModifier);
@@ -3035,7 +3035,7 @@ namespace fishingutils
                     {
                         uint16 fishid = 0;
                         memcpy(&fishid, &reqFish[i * sizeof(uint16)], sizeof(uint16));
-                        fish->reqFish->push_back(fishid);
+                        fish->reqFish->emplace_back(fishid);
                     }
                 }
 
@@ -3283,4 +3283,53 @@ namespace fishingutils
         LoadFishingCatchLists();
         CreateFishingPools();
     }
+
+    void CleanupFishing()
+    {
+        for (auto fish : FishList)
+        {
+            destroy(fish.second->reqFish);
+            destroy(fish.second);
+        }
+        FishList.clear();
+
+        for (auto rod : FishingRods)
+        {
+            destroy(rod.second);
+        }
+        FishingRods.clear();
+
+        for (auto bait : FishingBaits)
+        {
+            destroy(bait.second);
+        }
+        FishingBaits.clear();
+
+        for (auto fishmoblist : FishZoneMobList)
+        {
+            for (auto fishmob : fishmoblist.second)
+            {
+                destroy(fishmob.second);
+            }
+            fishmoblist.second.clear();
+        }
+        FishZoneMobList.clear();
+
+        for (auto fishArealist : FishingAreaList)
+        {
+            for (auto fishArea : fishArealist.second)
+            {
+                destroy_arr(fishArea.second->areaBounds);
+                destroy(fishArea.second);
+            }
+            fishArealist.second.clear();
+        }
+        FishingAreaList.clear();
+
+        for (auto fish : FishList)
+        {
+            destroy(fish.second);
+        }
+        FishList.clear();
+    };
 } // namespace fishingutils

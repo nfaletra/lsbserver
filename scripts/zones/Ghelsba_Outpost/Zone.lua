@@ -1,14 +1,10 @@
 -----------------------------------
 -- Zone: Ghelsba_Outpost (140)
 -----------------------------------
-local ID = require('scripts/zones/Ghelsba_Outpost/IDs')
-require('scripts/globals/conquest')
-require('scripts/globals/helm')
------------------------------------
 local zoneObject = {}
 
 zoneObject.onInitialize = function(zone)
-    xi.helm.initZone(zone, xi.helm.type.LOGGING)
+    xi.helm.initZone(zone, xi.helmType.LOGGING)
 end
 
 zoneObject.onZoneIn = function(player, prevZone)
@@ -32,10 +28,10 @@ end
 zoneObject.onTriggerAreaEnter = function(player, triggerArea)
 end
 
-zoneObject.onEventUpdate = function(player, csid, option)
+zoneObject.onEventUpdate = function(player, csid, option, npc)
 end
 
-zoneObject.onEventFinish = function(player, csid, option)
+zoneObject.onEventFinish = function(player, csid, option, npc)
 end
 
 return zoneObject

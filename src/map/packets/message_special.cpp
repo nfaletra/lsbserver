@@ -26,7 +26,7 @@
 
 #include "message_special.h"
 
-#include "../entities/baseentity.h"
+#include "entities/baseentity.h"
 
 CMessageSpecialPacket::CMessageSpecialPacket(CBaseEntity* PEntity, uint16 messageID, uint32 param0, uint32 param1, uint32 param2, uint32 param3, bool ShowName)
 {
@@ -45,7 +45,7 @@ CMessageSpecialPacket::CMessageSpecialPacket(CBaseEntity* PEntity, uint16 messag
     if (ShowName)
     {
         this->setSize(0x30);
-        memcpy(data + (0x1E), PEntity->GetName().c_str(), std::min<size_t>(PEntity->GetName().size(), PacketNameLength));
+        memcpy(data + (0x1E), PEntity->getName().c_str(), std::min<size_t>(PEntity->getName().size(), PacketNameLength));
     }
     else if (PEntity->objtype == TYPE_PC)
     {

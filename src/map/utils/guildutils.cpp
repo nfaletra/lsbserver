@@ -56,7 +56,7 @@ namespace guildutils
 
             while (sql->NextRow() == SQL_SUCCESS)
             {
-                g_PGuildList.push_back(new CGuild(sql->GetIntData(0), sql->GetStringData(1)));
+                g_PGuildList.emplace_back(new CGuild(sql->GetIntData(0), sql->GetStringData(1)));
             }
         }
 
@@ -74,7 +74,7 @@ namespace guildutils
 
             while (sql->NextRow() == SQL_SUCCESS)
             {
-                g_PGuildShopList.push_back(new CItemContainer(sql->GetIntData(0)));
+                g_PGuildShopList.emplace_back(new CItemContainer(sql->GetIntData(0)));
             }
         }
         for (auto* PGuildShop : g_PGuildShopList)
@@ -112,6 +112,22 @@ namespace guildutils
         UpdateGuildPointsPattern();
     }
 
+    void Cleanup()
+    {
+        // Delete pointers and cleanup vectors manually
+        for (auto guild : g_PGuildList)
+        {
+            destroy(guild);
+        }
+        g_PGuildList.clear();
+
+        for (auto itemContainer : g_PGuildShopList)
+        {
+            destroy(itemContainer);
+        }
+        g_PGuildList.clear();
+    }
+
     void UpdateGuildsStock()
     {
         for (auto* PGuildShop : g_PGuildShopList)
@@ -139,13 +155,13 @@ namespace guildutils
     {
         // TODO: This function can be faulty when dealing with multiple processes. Needs to be synchronized properly across servers.
 
-        bool doUpdate = static_cast<uint32>(serverutils::GetServerVar("[GUILD]pattern_update")) != CVanaTime::getInstance()->getSysYearDay();
+        bool doUpdate = static_cast<uint32>(serverutils::GetServerVar("[GUILD]pattern_update")) != CVanaTime::getInstance()->getJstYearDay();
 
         uint8 pattern = xirand::GetRandomNumber(8);
         if (doUpdate)
         {
             // write the new pattern and update time to try to prevent other servers from updating the pattern
-            serverutils::SetServerVar("[GUILD]pattern_update", CVanaTime::getInstance()->getSysYearDay());
+            serverutils::SetServerVar("[GUILD]pattern_update", CVanaTime::getInstance()->getJstYearDay());
             serverutils::SetServerVar("[GUILD]pattern", pattern);
             charutils::ClearCharVarFromAll("[GUILD]daily_points");
         }

@@ -4,7 +4,6 @@
 -- Info: Floor 20 and 40 Boss, Tortoise song dispels 3 buffs
 -----------------------------------
 mixins = { require('scripts/mixins/nyzul_boss_drops') }
-require('scripts/globals/nyzul')
 -----------------------------------
 local entity = {}
 
@@ -21,7 +20,7 @@ entity.onMobSpawn = function(mob)
     mob:setMobMod(xi.mobMod.ROAM_DISTANCE, 15)
 end
 
-entity.onMobEngaged = function(mob, target)
+entity.onMobEngage = function(mob, target)
 end
 
 entity.onMobFight = function(mob, target)

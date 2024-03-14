@@ -25,7 +25,7 @@
 
 #include "party_invite.h"
 
-#include "../entities/charentity.h"
+#include "entities/charentity.h"
 
 CPartyInvitePacket::CPartyInvitePacket(uint32 id, uint16 targid, CCharEntity* PInviter, INVITETYPE InviteType)
 {
@@ -37,5 +37,5 @@ CPartyInvitePacket::CPartyInvitePacket(uint32 id, uint16 targid, CCharEntity* PI
 
     ref<uint8>(0x0B) = InviteType;
 
-    memcpy(data + (0x0C), PInviter->GetName().c_str(), PInviter->GetName().size());
+    memcpy(data + (0x0C), PInviter->getName().c_str(), PInviter->getName().size());
 }
