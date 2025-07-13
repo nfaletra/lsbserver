@@ -20,10 +20,12 @@
 */
 
 #include "automatonentity.h"
+
 #include "ai/ai_container.h"
 #include "ai/controllers/automaton_controller.h"
 #include "ai/states/magic_state.h"
 #include "ai/states/mobskill_state.h"
+#include "common/tracy.h"
 #include "common/utils.h"
 #include "mob_modifier.h"
 #include "packets/action.h"
@@ -38,14 +40,13 @@
 CAutomatonEntity::CAutomatonEntity()
 : CPetEntity(PET_TYPE::AUTOMATON)
 {
+    TracyZoneScoped;
     PAI->SetController(nullptr);
 }
 
-CAutomatonEntity::~CAutomatonEntity() = default;
-
-void CAutomatonEntity::setFrame(AUTOFRAMETYPE frame)
+CAutomatonEntity::~CAutomatonEntity()
 {
-    m_Equip.Frame = frame;
+    TracyZoneScoped;
 }
 
 AUTOFRAMETYPE CAutomatonEntity::getFrame() const
@@ -53,19 +54,9 @@ AUTOFRAMETYPE CAutomatonEntity::getFrame() const
     return (AUTOFRAMETYPE)m_Equip.Frame;
 }
 
-void CAutomatonEntity::setHead(AUTOHEADTYPE head)
-{
-    m_Equip.Head = head;
-}
-
 AUTOHEADTYPE CAutomatonEntity::getHead() const
 {
     return (AUTOHEADTYPE)m_Equip.Head;
-}
-
-void CAutomatonEntity::setAttachment(uint8 slotid, uint8 id)
-{
-    m_Equip.Attachments[slotid] = id;
 }
 
 uint8 CAutomatonEntity::getAttachment(uint8 slotid)
@@ -85,45 +76,14 @@ bool CAutomatonEntity::hasAttachment(uint8 attachment)
     return false;
 }
 
-void CAutomatonEntity::setElementMax(uint8 element, uint8 max)
-{
-    m_ElementMax[element] = max;
-}
-
 uint8 CAutomatonEntity::getElementMax(uint8 element)
 {
     return m_ElementMax[element];
 }
 
-void CAutomatonEntity::addElementCapacity(uint8 element, int8 value)
-{
-    m_ElementEquip[element] += value;
-}
-
 uint8 CAutomatonEntity::getElementCapacity(uint8 element)
 {
     return m_ElementEquip[element];
-}
-
-uint8 CAutomatonEntity::getElementalCapacityBonus()
-{
-    return m_elementalCapacityBonus;
-}
-
-void CAutomatonEntity::setElementalCapacityBonus(uint8 bonus)
-{
-    if (bonus == m_elementalCapacityBonus)
-    {
-        return;
-    }
-
-    int8 difference = static_cast<int8>(bonus) - m_elementalCapacityBonus;
-    for (size_t i = 0; i < m_ElementMax.size(); ++i)
-    {
-        m_ElementMax[i] += difference;
-    }
-
-    m_elementalCapacityBonus = bonus;
 }
 
 void CAutomatonEntity::burdenTick()
@@ -194,7 +154,7 @@ void CAutomatonEntity::PostTick()
     {
         if (PMaster && PMaster->objtype == TYPE_PC)
         {
-            ((CCharEntity*)PMaster)->pushPacket(new CCharJobExtraPacket((CCharEntity*)PMaster, PMaster->GetMJob() == JOB_PUP));
+            ((CCharEntity*)PMaster)->pushPacket<CCharJobExtraPacket>((CCharEntity*)PMaster, PMaster->GetMJob() == JOB_PUP);
         }
     }
 }
@@ -251,7 +211,7 @@ void CAutomatonEntity::Spawn()
     status = allegiance == ALLEGIANCE_TYPE::MOB ? STATUS_TYPE::UPDATE : STATUS_TYPE::NORMAL;
     updatemask |= UPDATE_HP;
     PAI->Reset();
-    PAI->EventHandler.triggerListener("SPAWN", CLuaBaseEntity(this));
+    PAI->EventHandler.triggerListener("SPAWN", this);
     animation = ANIMATION_NONE;
     m_OwnerID.clean();
     HideName(false);

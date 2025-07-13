@@ -3,13 +3,15 @@
 -----------------------------------
 local ID = zones[xi.zone.CEIZAK_BATTLEGROUNDS]
 -----------------------------------
+---@type TZone
 local zoneObject = {}
 
 zoneObject.onInitialize = function(zone)
     -- Ergon Locus area at K-10
-    zone:registerTriggerArea(1, 357.819, 11, -250.201, 0, 0, 0)
+    zone:registerCylindricalTriggerArea(1, 357.819, -250.201, 11)
+
     -- Ergon Locus area at I-8
-    zone:registerTriggerArea(2, 87.2, 8, 72.9, 0, 0, 0)
+    zone:registerCylindricalTriggerArea(2, 87.2, 72.9, 8)
 
     xi.reives.setupZone(zone)
 end
@@ -31,7 +33,7 @@ end
 -- Cutscene for Dances with Luopans.
 local function triggerUncannySensationMessage(player)
     if
-        player:getQuestStatus(xi.quest.log_id.ADOULIN, xi.quest.id.adoulin.DANCES_WITH_LUOPANS) == QUEST_ACCEPTED and
+        player:getQuestStatus(xi.questLog.ADOULIN, xi.quest.id.adoulin.DANCES_WITH_LUOPANS) == xi.questStatus.QUEST_ACCEPTED and
         player:hasKeyItem(xi.ki.LUOPAN) and
         player:getCharVar('GEO_DWL_Luopan') == 0
     then
@@ -41,7 +43,7 @@ local function triggerUncannySensationMessage(player)
 end
 
 zoneObject.onTriggerAreaEnter = function(player, triggerArea)
-    switch (triggerArea:GetTriggerAreaID()): caseof
+    switch (triggerArea:getTriggerAreaID()): caseof
     {
         [1] = function(x)
             triggerUncannySensationMessage(player)

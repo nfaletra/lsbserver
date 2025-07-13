@@ -4,6 +4,7 @@
 -----------------------------------
 xi = xi or {}
 
+---@enum xi.subEffect
 xi.subEffect =
 {
     -- ATTACKS
@@ -37,6 +38,7 @@ xi.subEffect =
     HP_DRAIN            = 21,  -- 1-10101      43
     MP_DRAIN            = 22,  -- Verified shared group 3
     TP_DRAIN            = 22,  -- Verified shared group 3
+    STATUS_DRAIN        = 22,  -- Verified shared group 3
     HASTE               = 23,
     -- There are no additional attack effect animations beyond 23. Some effects share subeffect/animations.
 

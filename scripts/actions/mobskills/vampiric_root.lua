@@ -1,11 +1,12 @@
 -----------------------------------
 -- Vampiric Root
--- Deals dark damage to a single target. Additional effect: Drain
+-- Steals HP from a single target and absorbs positive status effects.
 -- Type: Magical
 -- Utsusemi/Blink absorb: 1 shadow
 -- Range: Melee
--- Notes: If used against undead, it will simply do damage and not drain HP.
+-- Notes: (Unverified) If used against undead, it will simply do damage and not drain HP.
 -----------------------------------
+---@type TMobSkill
 local mobskillObject = {}
 
 mobskillObject.onMobSkillCheck = function(target, mob, skill)
@@ -13,13 +14,21 @@ mobskillObject.onMobSkillCheck = function(target, mob, skill)
 end
 
 mobskillObject.onMobWeaponSkill = function(target, mob, skill)
-    local dmgmod = 1
-    local info = xi.mobskills.mobMagicalMove(mob, target, skill, mob:getWeaponDmg() * 3, xi.element.DARK, dmgmod, xi.mobskills.magicalTpBonus.NO_EFFECT)
-    local dmg = xi.mobskills.mobFinalAdjustments(info.dmg, mob, skill, target, xi.attackType.MAGICAL, xi.damageType.DARK, xi.mobskills.shadowBehavior.NUMSHADOWS_1)
+    local damage = mob:getWeaponDmg() * 3
 
-    skill:setMsg(xi.mobskills.mobPhysicalDrainMove(mob, target, skill, xi.mobskills.drainType.HP, dmg))
+    damage = xi.mobskills.mobMagicalMove(mob, target, skill, damage, xi.element.DARK, 1, xi.mobskills.magicalTpBonus.NO_EFFECT)
+    damage = xi.mobskills.mobFinalAdjustments(damage, mob, skill, target, xi.attackType.MAGICAL, xi.damageType.DARK, xi.mobskills.shadowBehavior.NUMSHADOWS_1)
 
-    return dmg
+    skill:setMsg(xi.mobskills.mobPhysicalDrainMove(mob, target, skill, xi.mobskills.drainType.HP, damage))
+
+    -- Absorb ALL positive status effects
+    -- Note: Some sources claim this includes food and reraise which has been proven to be false
+    local result = mob:stealStatusEffect(target)
+    while result ~= 0 do
+        result = mob:stealStatusEffect(target)
+    end
+
+    return damage
 end
 
 return mobskillObject

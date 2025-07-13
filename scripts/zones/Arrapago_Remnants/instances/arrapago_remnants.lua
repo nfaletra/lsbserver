@@ -20,9 +20,12 @@ instanceObject.afterInstanceRegister = function(player)
 end
 
 instanceObject.onInstanceCreated = function(instance)
-    for i, v in pairs(ID.npc[1][1]) do
+    for _, v in pairs(ID.npc[1][1]) do
         local npc = GetNPCByID(v, instance)
-        npc:setStatus(xi.status.NORMAL)
+
+        if npc then
+            npc:setStatus(xi.status.NORMAL)
+        end
     end
 
     instance:setStage(1)
@@ -53,8 +56,8 @@ instanceObject.onInstanceComplete = function(instance)
 end
 
 instanceObject.onTriggerAreaEnter = function(player, triggerArea, instance)
-    if triggerArea:GetTriggerAreaID() <= 11 then
-        player:startEvent(199 + triggerArea:GetTriggerAreaID())
+    if triggerArea:getTriggerAreaID() <= 11 then
+        player:startEvent(199 + triggerArea:getTriggerAreaID())
     end
 end
 
@@ -68,15 +71,17 @@ instanceObject.onInstanceProgressUpdate = function(instance, progress, elapsed)
     elseif instance:getStage() == 3 and progress == 1 then
         SpawnMob(ID.mob[2][0].astrologer, instance)
     elseif instance:getStage() == 6 and progress == 1 then
-        GetNPCByID(ID.npc[6].DOOR, instance):setLocalVar('start', os.time())
+        GetNPCByID(ID.npc[6].DOOR, instance):setLocalVar('start', GetSystemTime())
     elseif instance:getStage() == 7 and progress == 0 then
         local door = GetNPCByID(ID.npc[6].DOOR, instance)
-        door:setLocalVar('current', os.time())
-        if door:getLocalVar('current') - door:getLocalVar('start') <= 420 then
-            SpawnMob(ID.mob[6].treasure_hunter1, instance)
-            SpawnMob(ID.mob[6].treasure_hunter2, instance)
-            SpawnMob(ID.mob[6].qiqirn_mine_1, instance)
-            SpawnMob(ID.mob[6].qiqirn_mine_2, instance)
+        if door then
+            door:setLocalVar('current', GetSystemTime())
+            if door:getLocalVar('current') - door:getLocalVar('start') <= 420 then
+                SpawnMob(ID.mob[6].treasure_hunter1, instance)
+                SpawnMob(ID.mob[6].treasure_hunter2, instance)
+                SpawnMob(ID.mob[6].qiqirn_mine_1, instance)
+                SpawnMob(ID.mob[6].qiqirn_mine_2, instance)
+            end
         end
     end
 end

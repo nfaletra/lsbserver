@@ -3,13 +3,23 @@
 -- Area: Nyzul Isle
 -- Info : Floor 60 80 100 Boss
 -----------------------------------
-mixins = { require('scripts/mixins/nyzul_boss_drops') }
+mixins =
+{
+    require('scripts/mixins/nyzul_boss_drops'),
+    require('scripts/mixins/families/khimaira'),
+}
 -----------------------------------
+---@type TMobEntity
 local entity = {}
 
-entity.onMobSpawn = function(mob)
-    -- mob:addImmunity(xi.immunity.SLEEP)
+entity.onMobInitialize = function(mob)
+    -- Set Immunities.
+    -- mob:addImmunity(xi.immunity.LIGHT_SLEEP)
+    -- mob:addImmunity(xi.immunity.DARK_SLEEP)
     -- mob:addImmunity(xi.immunity.TERROR)
+end
+
+entity.onMobSpawn = function(mob)
     mob:setMod(xi.mod.MEVA, 25)
     mob:setMod(xi.mod.MAIN_DMG_RATING, 33)
     mob:setMod(xi.mod.DOUBLE_ATTACK, 15)

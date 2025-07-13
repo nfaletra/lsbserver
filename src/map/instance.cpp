@@ -1,20 +1,20 @@
 ﻿/*
 ===========================================================================
 
-Copyright (c) 2010-2015 Darkstar Dev Teams
+  Copyright (c) 2010-2015 Darkstar Dev Teams
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see http://www.gnu.org/licenses/
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see http://www.gnu.org/licenses/
 
 ===========================================================================
 */
@@ -30,35 +30,21 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 
 #include "common/timer.h"
 
-CInstance::CInstance(CZone* zone, uint16 instanceid)
+CInstance::CInstance(CZone* zone, uint32 instanceid)
 : CZoneEntities(zone)
 , m_instanceid(instanceid)
 , m_zone(zone)
 {
+    TracyZoneScoped;
     LoadInstance();
 
-    m_startTime = server_clock::now();
+    m_startTime = timer::now();
     m_wipeTimer = m_startTime;
 }
 
 CInstance::~CInstance()
 {
-    for (auto entity : m_mobList)
-    {
-        destroy(entity.second);
-    }
-    for (auto entity : m_npcList)
-    {
-        destroy(entity.second);
-    }
-    for (auto entity : m_petList)
-    {
-        destroy(entity.second);
-    }
-    for (auto entity : m_trustList)
-    {
-        destroy(entity.second);
-    }
+    TracyZoneScoped;
 }
 
 uint16 CInstance::GetID() const
@@ -85,42 +71,44 @@ uint32 CInstance::GetStage() const
 void CInstance::LoadInstance()
 {
     TracyZoneScoped;
-    static const char* Query = "SELECT "
-                               "instance_name, "
-                               "time_limit, "
-                               "entrance_zone, "
-                               "start_x, "
-                               "start_y, "
-                               "start_z, "
-                               "start_rot, "
-                               "music_day, "
-                               "music_night, "
-                               "battlesolo, "
-                               "battlemulti "
-                               "FROM instance_list "
-                               "WHERE instanceid = %u "
-                               "LIMIT 1";
 
-    if (sql->Query(Query, m_instanceid) != SQL_ERROR && sql->NumRows() != 0 && sql->NextRow() == SQL_SUCCESS)
+    const auto rset = db::preparedStmt("SELECT "
+                                       "instance_name, "
+                                       "time_limit, "
+                                       "entrance_zone, "
+                                       "start_x, "
+                                       "start_y, "
+                                       "start_z, "
+                                       "start_rot, "
+                                       "music_day, "
+                                       "music_night, "
+                                       "battlesolo, "
+                                       "battlemulti "
+                                       "FROM instance_list "
+                                       "WHERE instanceid = ? "
+                                       "LIMIT 1",
+                                       m_instanceid);
+
+    if (rset && rset->rowsCount() && rset->next())
     {
-        m_instanceName.insert(0, (const char*)sql->GetData(0));
+        m_instanceName = rset->get<std::string>("instance_name");
 
-        m_timeLimit                       = std::chrono::minutes(sql->GetUIntData(1));
-        m_entrance                        = sql->GetUIntData(2);
-        m_entryloc.x                      = sql->GetFloatData(3);
-        m_entryloc.y                      = sql->GetFloatData(4);
-        m_entryloc.z                      = sql->GetFloatData(5);
-        m_entryloc.rotation               = sql->GetUIntData(6);
-        m_zone_music_override.m_songDay   = sql->GetUIntData(7);
-        m_zone_music_override.m_songNight = sql->GetUIntData(8);
-        m_zone_music_override.m_bSongS    = sql->GetUIntData(9);
-        m_zone_music_override.m_bSongM    = sql->GetUIntData(10);
+        m_timeLimit                       = std::chrono::minutes(rset->get<uint32>("time_limit"));
+        m_entrance                        = rset->get<uint16>("entrance_zone");
+        m_entryloc.x                      = rset->get<float>("start_x");
+        m_entryloc.y                      = rset->get<float>("start_y");
+        m_entryloc.z                      = rset->get<float>("start_z");
+        m_entryloc.rotation               = rset->get<uint8>("start_rot");
+        m_zone_music_override.m_songDay   = !rset->isNull("music_day") ? xi::optional(rset->get<uint16>("music_day")) : std::nullopt;
+        m_zone_music_override.m_songNight = !rset->isNull("music_night") ? xi::optional(rset->get<uint16>("music_night")) : std::nullopt;
+        m_zone_music_override.m_bSongS    = !rset->isNull("battlesolo") ? xi::optional(rset->get<uint16>("battlesolo")) : std::nullopt;
+        m_zone_music_override.m_bSongM    = !rset->isNull("battlemulti") ? xi::optional(rset->get<uint16>("battlemulti")) : std::nullopt;
 
         // Add to Lua cache
         // TODO: This will happen more often than needed, but not so often that it's a performance concern
-        auto zone     = m_zone->getName();
-        auto name     = m_instanceName;
-        auto filename = fmt::format("./scripts/zones/{}/instances/{}.lua", zone, name);
+        const auto zone     = m_zone->getName();
+        const auto name     = m_instanceName;
+        const auto filename = fmt::format("./scripts/zones/{}/instances/{}.lua", zone, name);
         luautils::CacheLuaObjectFromFile(filename);
     }
     else
@@ -160,27 +148,27 @@ position_t CInstance::GetEntryLoc()
     return m_entryloc;
 }
 
-duration CInstance::GetTimeLimit()
+timer::duration CInstance::GetTimeLimit()
 {
     return m_timeLimit;
 }
 
-void CInstance::SetTimeLimit(duration time)
+void CInstance::SetTimeLimit(timer::duration time)
 {
     m_timeLimit = time;
 }
 
-duration CInstance::GetLastTimeUpdate()
+timer::duration CInstance::GetLastTimeUpdate()
 {
     return m_lastTimeUpdate;
 }
 
-duration CInstance::GetWipeTime()
+timer::duration CInstance::GetWipeTime()
 {
     return m_wipeTimer - m_startTime;
 }
 
-duration CInstance::GetElapsedTime(time_point tick)
+timer::duration CInstance::GetElapsedTime(timer::time_point tick)
 {
     return tick - m_startTime;
 }
@@ -204,7 +192,7 @@ void CInstance::SetEntryLoc(float x, float y, float z, float rot)
     m_entryloc.rotation = (uint8)rot;
 }
 
-void CInstance::SetLastTimeUpdate(duration lastTime)
+void CInstance::SetLastTimeUpdate(timer::duration lastTime)
 {
     m_lastTimeUpdate = lastTime;
 }
@@ -220,7 +208,7 @@ void CInstance::SetStage(uint32 stage)
     m_stage = stage;
 }
 
-void CInstance::SetWipeTime(duration time)
+void CInstance::SetWipeTime(timer::duration time)
 {
     m_wipeTimer = time + m_startTime;
 }
@@ -236,11 +224,11 @@ void CInstance::SetLocalVar(std::string const& name, uint64_t value)
  *                                                                       *
  ************************************************************************/
 
-void CInstance::CheckTime(time_point tick)
+void CInstance::CheckTime(timer::time_point tick)
 {
     if (m_lastTimeCheck + 1s <= tick && !Failed())
     {
-        luautils::OnInstanceTimeUpdate(GetZone(), this, (uint32)std::chrono::duration_cast<std::chrono::milliseconds>(GetElapsedTime(tick)).count());
+        luautils::OnInstanceTimeUpdate(GetZone(), this, static_cast<uint32>(timer::count_milliseconds(GetElapsedTime(tick))));
         m_lastTimeCheck = tick;
     }
 }
@@ -259,17 +247,35 @@ bool CInstance::CharRegistered(CCharEntity* PChar)
 
 void CInstance::ClearEntities()
 {
-    auto clearStates = [](auto& entity)
+    auto clearStates = [](CBattleEntity* entity)
     {
-        if (static_cast<CBattleEntity*>(entity.second)->isAlive())
+        if (static_cast<CBattleEntity*>(entity)->isAlive())
         {
-            entity.second->PAI->ClearStateStack();
+            entity->PAI->ClearStateStack();
         }
     };
-    std::for_each(m_charList.cbegin(), m_charList.cend(), clearStates);
-    std::for_each(m_mobList.cbegin(), m_mobList.cend(), clearStates);
-    std::for_each(m_petList.cbegin(), m_petList.cend(), clearStates);
-    std::for_each(m_trustList.cbegin(), m_trustList.cend(), clearStates);
+
+    // clang-format off
+    ForEachChar([&](CCharEntity* PChar)
+    {
+        clearStates(PChar);
+    });
+
+    ForEachMob([&](CMobEntity* PMob)
+    {
+        clearStates(PMob);
+    });
+
+    ForEachPet([&](CPetEntity* PPet)
+    {
+        clearStates(PPet);
+    });
+
+    ForEachTrust([&](CTrustEntity* PTrust)
+    {
+        clearStates(PTrust);
+    });
+    // clang-format on
 }
 
 void CInstance::Fail()
@@ -311,22 +317,22 @@ bool CInstance::CheckFirstEntry(uint32 id)
     return m_enteredChars.insert(id).second;
 }
 
-uint8 CInstance::GetSoloBattleMusic()
+uint16 CInstance::GetSoloBattleMusic()
 {
-    return m_zone_music_override.m_bSongS != (uint8)-1 ? m_zone_music_override.m_bSongS : GetZone()->GetSoloBattleMusic();
+    return m_zone_music_override.m_bSongS ? *m_zone_music_override.m_bSongS : GetZone()->GetSoloBattleMusic();
 }
 
-uint8 CInstance::GetPartyBattleMusic()
+uint16 CInstance::GetPartyBattleMusic()
 {
-    return m_zone_music_override.m_bSongM != (uint8)-1 ? m_zone_music_override.m_bSongM : GetZone()->GetPartyBattleMusic();
+    return m_zone_music_override.m_bSongM ? *m_zone_music_override.m_bSongM : GetZone()->GetPartyBattleMusic();
 }
 
-uint8 CInstance::GetBackgroundMusicDay()
+uint16 CInstance::GetBackgroundMusicDay()
 {
-    return m_zone_music_override.m_songDay != (uint8)-1 ? m_zone_music_override.m_songDay : GetZone()->GetBackgroundMusicDay();
+    return m_zone_music_override.m_songDay ? *m_zone_music_override.m_songDay : GetZone()->GetBackgroundMusicDay();
 }
 
-uint8 CInstance::GetBackgroundMusicNight()
+uint16 CInstance::GetBackgroundMusicNight()
 {
-    return m_zone_music_override.m_songNight != (uint8)-1 ? m_zone_music_override.m_songNight : GetZone()->GetBackgroundMusicNight();
+    return m_zone_music_override.m_songNight ? *m_zone_music_override.m_songNight : GetZone()->GetBackgroundMusicNight();
 }

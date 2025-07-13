@@ -1,20 +1,20 @@
 ﻿/*
 ===========================================================================
 
-Copyright (c) 2010-2015 Darkstar Dev Teams
+  Copyright (c) 2010-2015 Darkstar Dev Teams
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see http://www.gnu.org/licenses/
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see http://www.gnu.org/licenses/
 
 ===========================================================================
 */
@@ -27,28 +27,46 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #include "status_effect_container.h"
 #include "utils/petutils.h"
 
-CPetController::CPetController(CPetEntity* _PPet)
+CPetController::CPetController(CMobEntity* _PPet)
 : CMobController(_PPet)
 , PPet(_PPet)
 {
-    // #TODO: this probably will have to depend on pet type (automaton does WS on its own..)
+    // TODO: this probably will have to depend on pet type (automaton does WS on its own..)
     SetWeaponSkillEnabled(false);
 }
 
-void CPetController::Tick(time_point tick)
+void CPetController::Tick(timer::time_point tick)
 {
     TracyZoneScoped;
     TracyZoneString(PPet->getName());
 
-    if (PPet->shouldDespawn(tick))
+    bool isPlayerPet = PPet->objtype == TYPE_PET || (PPet->objtype == TYPE_MOB && PPet->PMaster && PPet->PMaster->objtype == TYPE_PC);
+
+    // if a player pet then check if a charmed mob or jug pet and if it should despawn
+    if (isPlayerPet)
     {
-        petutils::DespawnPet(PPet->PMaster);
-        return;
+        // if a charmed mob and charm time is up then despawn
+        if (PPet->isCharmed && tick > PPet->charmTime)
+        {
+            petutils::DespawnPet(PPet->PMaster);
+            return;
+        }
+
+        // if a jug pet and the current time > jug spawn time + jug duration then despawn
+        auto* PPetEntity = dynamic_cast<CPetEntity*>(PPet);
+        if (PPetEntity && PPetEntity->isAlive() && PPetEntity->getPetType() == PET_TYPE::JUG_PET)
+        {
+            if (tick > PPetEntity->getJugSpawnTime() + PPetEntity->getJugDuration())
+            {
+                petutils::DespawnPet(PPetEntity->PMaster);
+                return;
+            }
+        }
     }
     CMobController::Tick(tick);
 }
 
-void CPetController::DoRoamTick(time_point tick)
+void CPetController::DoRoamTick(timer::time_point tick)
 {
     if ((PPet->PMaster == nullptr || PPet->PMaster->isDead()) && PPet->isAlive() && PPet->objtype != TYPE_MOB)
     {
@@ -62,22 +80,30 @@ void CPetController::DoRoamTick(time_point tick)
         return;
     }
 
-    // automaton, wyvern
-    if (PPet->getPetType() == PET_TYPE::WYVERN || PPet->getPetType() == PET_TYPE::AUTOMATON)
+    if (PPet->objtype == TYPE_PET)
     {
-        if (PetIsHealing())
+        CPetEntity* PetEntity = static_cast<CPetEntity*>(PPet);
+        // automaton, wyvern
+        if (PetEntity->getPetType() == PET_TYPE::WYVERN || PetEntity->getPetType() == PET_TYPE::AUTOMATON)
+        {
+            if (PetIsHealing())
+            {
+                return;
+            }
+        }
+        else if (PetEntity->isBstPet() && PPet->StatusEffectContainer->GetStatusEffect(EFFECT_HEALING))
         {
             return;
         }
-    }
-    else if (PPet->isBstPet() && PPet->StatusEffectContainer->GetStatusEffect(EFFECT_HEALING))
-    {
-        return;
-    }
-    else if (PPet->m_PetID <= PETID_DARKSPIRIT)
-    {
-        // this will respect the pet's mob casting cooldown properties via MOBMOD_MAGIC_COOL
-        if (CMobController::IsSpellReady(0) && CMobController::TryCastSpell())
+        else if (PetEntity->m_PetID == PETID_LIGHTSPIRIT) // Only Light Spirit will cast on roam tick
+        {
+            // this will respect the pet's mob casting cooldown properties via MOBMOD_MAGIC_COOL
+            if (CMobController::IsSpellReady(0) && CMobController::TryCastSpell())
+            {
+                return;
+            }
+        }
+        else if (PetEntity->m_PetID == PETID_LUOPAN) // Luopans do nothing
         {
             return;
         }
@@ -87,8 +113,16 @@ void CPetController::DoRoamTick(time_point tick)
 
     if (currentDistance > PetRoamDistance)
     {
-        if (currentDistance < 35.0f && PPet->PAI->PathFind->PathAround(PPet->PMaster->loc.p, 2.0f, PATHFLAG_RUN | PATHFLAG_WALLHACK))
+        if (currentDistance < 35.0f)
         {
+            if (!PPet->PAI->PathFind->IsFollowingPath() ||
+                distance(PPet->PAI->PathFind->GetDestination(), PPet->PMaster->loc.p) > 2.0f) // recalculate path only if owner moves more than X yalms
+            {
+                if (!PPet->PAI->PathFind->PathAround(PPet->PMaster->loc.p, 2.0f, PATHFLAG_RUN | PATHFLAG_WALLHACK))
+                {
+                    PPet->PAI->PathFind->PathInRange(PPet->PMaster->loc.p, 2.0f, PATHFLAG_RUN | PATHFLAG_WALLHACK);
+                }
+            }
             PPet->PAI->PathFind->FollowPath(m_Tick);
         }
         else if (PPet->GetSpeed() > 0)
@@ -107,7 +141,7 @@ bool CPetController::PetIsHealing()
     {
         // animation down
         PPet->animation = ANIMATION_HEALING;
-        PPet->StatusEffectContainer->AddStatusEffect(new CStatusEffect(EFFECT_HEALING, 0, 0, settings::get<uint8>("map.HEALING_TICK_DELAY"), 0));
+        PPet->StatusEffectContainer->AddStatusEffect(new CStatusEffect(EFFECT_HEALING, 0, 0, std::chrono::seconds(settings::get<uint8>("map.HEALING_TICK_DELAY")), 0s));
         PPet->updatemask |= UPDATE_HP;
         return true;
     }

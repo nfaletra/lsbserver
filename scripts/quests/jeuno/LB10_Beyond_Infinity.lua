@@ -7,13 +7,36 @@
 local ruludeID = zones[xi.zone.RULUDE_GARDENS]
 -----------------------------------
 
-local quest = Quest:new(xi.quest.log_id.JEUNO, xi.quest.id.jeuno.BEYOND_INFINITY)
+local quest = Quest:new(xi.questLog.JEUNO, xi.quest.id.jeuno.BEYOND_INFINITY)
 
 quest.reward =
 {
     fame = 50,
-    fameArea = xi.quest.fame_area.JEUNO,
+    fameArea = xi.fameArea.JEUNO,
     title = xi.title.BUSHIN_ASPIRANT,
+}
+
+local atoriBattlefieldIds =
+{
+    [xi.zone.BALGAS_DAIS]      = xi.battlefield.id.BEYOND_INFINITY_BALGAS_DAIS,
+    [xi.zone.HORLAIS_PEAK]     = xi.battlefield.id.BEYOND_INFINITY_HORLAIS_PEAK,
+    [xi.zone.QUBIA_ARENA]      = xi.battlefield.id.BEYOND_INFINITY,
+    [xi.zone.WAUGHROON_SHRINE] = xi.battlefield.id.BEYOND_INFINITY_WAUGHROON_SHRINE,
+}
+
+local atoriBattlefieldZone =
+{
+    onEventFinish =
+    {
+        [32001] = function(player, csid, option, npc)
+            local battlefieldWin = player:getLocalVar('battlefieldWin')
+
+            if battlefieldWin == atoriBattlefieldIds[player:getZoneID()] then
+                npcUtil.giveItem(player, xi.item.SCROLL_OF_INSTANT_WARP)
+                quest:setVar(player, 'Prog', 1)
+            end
+        end,
+    },
 }
 
 quest.sections =
@@ -23,8 +46,9 @@ quest.sections =
     -- In most cases, the quest will already be accepted.
     {
         check = function(player, status, vars)
-            return status == QUEST_AVAILABLE and
-                player:hasCompletedQuest(xi.quest.log_id.JEUNO, xi.quest.id.jeuno.PRELUDE_TO_PUISSANCE)
+            return status == xi.questStatus.QUEST_AVAILABLE and
+                player:hasCompletedQuest(xi.questLog.JEUNO, xi.quest.id.jeuno.PRELUDE_TO_PUISSANCE) and
+                player:getLevelCap() == 95
         end,
 
         [xi.zone.RULUDE_GARDENS] =
@@ -32,7 +56,21 @@ quest.sections =
             ['Nomad_Moogle'] =
             {
                 onTrigger = function(player, npc)
-                    return quest:progressEvent(10045, 0, 1, 5, 0, 1)
+                    local playerLevel     = player:getMainLvl()
+                    local limitBreaker    = player:hasKeyItem(xi.ki.LIMIT_BREAKER) and 1 or 2
+                    local lastQuestNumber = 0
+                    local lastQuestStage  = 0
+                    local rejectedOffer   = 0
+                    if
+                        xi.settings.main.MAX_LEVEL > 95 and
+                        limitBreaker == 1 and
+                        playerLevel > 90
+                    then
+                        lastQuestNumber = 5
+                        rejectedOffer   = player:getLocalVar('rejectedStartLB10')
+                    end
+
+                    return quest:progressEvent(10045, playerLevel, limitBreaker, lastQuestNumber, lastQuestStage, rejectedOffer)
                 end,
             },
 
@@ -68,7 +106,8 @@ quest.sections =
     -- Section: Quest accepted.
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED and vars.Prog == 0 and
+            return status == xi.questStatus.QUEST_ACCEPTED and
+                vars.Prog == 0 and
                 player:hasKeyItem(xi.ki.SOUL_GEM_CLASP)
         end,
 
@@ -77,7 +116,12 @@ quest.sections =
             ['Nomad_Moogle'] =
             {
                 onTrigger = function(player, npc)
-                    return quest:event(10045, 0, 1, 5, 1)
+                    local playerLevel     = player:getMainLvl()
+                    local limitBreaker    = player:hasKeyItem(xi.ki.LIMIT_BREAKER) and 1 or 2
+                    local lastQuestNumber = 5
+                    local lastQuestStage  = 1
+
+                    return quest:event(10045, playerLevel, limitBreaker, lastQuestNumber, lastQuestStage)
                 end,
             },
 
@@ -105,10 +149,23 @@ quest.sections =
         },
     },
 
+    -- BCNM Win Events.  Soul Gem Clasp is required for entry, and removed
+    -- after.  Separate section to not confuse with the failed event.
+    {
+        check = function(player, status, vars)
+            return status == xi.questStatus.QUEST_ACCEPTED and vars.Prog == 0
+        end,
+
+        [xi.zone.BALGAS_DAIS]      = atoriBattlefieldZone,
+        [xi.zone.HORLAIS_PEAK]     = atoriBattlefieldZone,
+        [xi.zone.QUBIA_ARENA]      = atoriBattlefieldZone,
+        [xi.zone.WAUGHROON_SHRINE] = atoriBattlefieldZone,
+    },
+
     -- Section: Quest accepted. We failed BCNM.
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED and
+            return status == xi.questStatus.QUEST_ACCEPTED and
                 vars.Prog == 0 and
                 not player:hasKeyItem(xi.ki.SOUL_GEM_CLASP)
         end,
@@ -117,18 +174,20 @@ quest.sections =
         {
             ['Nomad_Moogle'] =
             {
-                onTrigger = function(player, npc)
-                    if player:getMeritCount() >= 1 then
-                        return quest:progressEvent(10045, 0, 1, 5, 3, 0, 0, 1)
-                    else
-                        return quest:event(10045, 0, 1, 5, 3)
-                    end
-                end,
-
                 onTrade = function(player, npc, trade)
                     if npcUtil.tradeHasExactly(trade, { { xi.item.HIGH_KINDREDS_CREST, 5 } }) then
                         return quest:progressEvent(10195, 1)
                     end
+                end,
+
+                onTrigger = function(player, npc)
+                    local playerLevel     = player:getMainLvl()
+                    local limitBreaker    = player:hasKeyItem(xi.ki.LIMIT_BREAKER) and 1 or 2
+                    local lastQuestNumber = 5
+                    local lastQuestStage  = 3 -- I guess failing is considered a new stage.
+                    local meritCost       = player:getMeritCount() >= 1 and 1 or 0
+
+                    return quest:progressEvent(10045, playerLevel, limitBreaker, lastQuestNumber, lastQuestStage, 0, 0, meritCost)
                 end,
             },
 
@@ -184,7 +243,7 @@ quest.sections =
     -- Section: Quest accepted. We beated the BCNM.
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED and
+            return status == xi.questStatus.QUEST_ACCEPTED and
                 vars.Prog == 1
         end,
 
@@ -193,7 +252,7 @@ quest.sections =
             ['Nomad_Moogle'] =
             {
                 onTrigger = function(player, npc)
-                    return quest:progressEvent(10139)
+                    return quest:progressEvent(10139, 75, 1)
                 end,
             },
 
@@ -210,9 +269,10 @@ quest.sections =
     },
 
     -- Section: Quest completed.
+    -- TODO: Move all of this to "martial mastery" quest
     {
         check = function(player, status, vars)
-            return status == QUEST_COMPLETED
+            return status == xi.questStatus.QUEST_COMPLETED
         end,
 
         [xi.zone.RULUDE_GARDENS] =
@@ -220,13 +280,16 @@ quest.sections =
             ['Nomad_Moogle'] =
             {
                 onTrigger = function(player, npc)
+                    local playerLevel  = player:getMainLvl()
+                    local limitBreaker = player:hasKeyItem(xi.ki.LIMIT_BREAKER) and 1 or 2
+
                     if
                         player:getMainLvl() >= 99 and
                         not player:hasKeyItem(xi.ki.JOB_BREAKER)
                     then
-                        return quest:progressEvent(10240, 0, 0, 0, 0)
+                        return quest:progressEvent(10240, playerLevel, limitBreaker)
                     else
-                        return quest:event(10045, 0, 1, 0, 0)
+                        return quest:event(10045, playerLevel, limitBreaker, 0, 0)
                     end
                 end,
             },

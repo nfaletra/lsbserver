@@ -4,18 +4,19 @@
 local ID = zones[xi.zone.LOWER_JEUNO]
 local lowerJeunoGlobal = require('scripts/zones/Lower_Jeuno/globals')
 -----------------------------------
+---@type TZone
 local zoneObject = {}
 
 zoneObject.onInitialize = function(zone)
-    zone:registerTriggerArea(1, 23, 0, -43, 44, 7, -39) -- Inside Tenshodo HQ. TODO: Find out if this is used other than in ZM 17 (not anymore). Remove if not.
+    zone:registerCuboidTriggerArea(1, 23, 0, -43, 44, 7, -39) -- Inside Tenshodo HQ. TODO: Find out if this is used other than in ZM 17 (not anymore). Remove if not.
     xi.chocobo.initZone(zone)
 end
 
 zoneObject.onZoneIn = function(player, prevZone)
     local cs = -1
 
-    local month = tonumber(os.date('%m'))
-    local day = tonumber(os.date('%d'))
+    local month = JstMonth()
+    local day = JstDayOfTheMonth()
 
     -- Retail start/end dates vary, I am going with Dec 5th through Jan 5th.
     if
@@ -40,7 +41,7 @@ zoneObject.onZoneIn = function(player, prevZone)
 end
 
 zoneObject.onConquestUpdate = function(zone, updatetype, influence, owner, ranking, isConquestAlliance)
-    xi.conq.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
+    xi.conquest.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
 end
 
 zoneObject.onTriggerAreaEnter = function(player, triggerArea)
@@ -55,7 +56,10 @@ zoneObject.onGameHour = function(zone)
     if vanadielHour == 7 then
         for i = 0, 11 do
             local lamp = GetNPCByID(ID.npc.STREETLAMP_OFFSET + i)
-            lamp:setAnimation(xi.anim.CLOSE_DOOR)
+
+            if lamp then
+                lamp:setAnimation(xi.anim.CLOSE_DOOR)
+            end
         end
 
     -- 8PM: make quest available
@@ -82,6 +86,10 @@ zoneObject.onGameHour = function(zone)
     elseif vanadielHour == 1 then
         if playerOnQuestId == 0 then
             local npc = GetNPCByID(ID.npc.VHANA_EHGAKLYWHA)
+            if not npc then
+                return
+            end
+
             npc:clearPath()
             npc:setStatus(0)
             npc:initNpcAi()

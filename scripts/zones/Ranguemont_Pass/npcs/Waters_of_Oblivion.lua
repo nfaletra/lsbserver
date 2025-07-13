@@ -6,10 +6,8 @@
 -----------------------------------
 local ID = zones[xi.zone.RANGUEMONT_PASS]
 -----------------------------------
+---@type TNpcEntity
 local entity = {}
-
-entity.onTrade = function(player, npc, trade)
-end
 
 entity.onTrigger = function(player, npc)
     local trosKilled = player:getCharVar('TrosKilled')
@@ -17,7 +15,7 @@ entity.onTrigger = function(player, npc)
     if
         player:hasKeyItem(xi.ki.MERTAIRES_BRACELET) and
         not GetMobByID(ID.mob.TROS):isSpawned() and
-        (trosKilled == 0 or (os.time() - player:getCharVar('Tros_Timer')) > 60)
+        (trosKilled == 0 or (GetSystemTime() - player:getCharVar('Tros_Timer')) > 60)
     then
         player:messageSpecial(ID.text.SENSE_OF_FOREBODING)
         SpawnMob(ID.mob.TROS):updateClaim(player)
@@ -28,12 +26,9 @@ entity.onTrigger = function(player, npc)
     end
 end
 
-entity.onEventUpdate = function(player, csid, option, npc)
-end
-
 entity.onEventFinish = function(player, csid, option, npc)
     if csid == 8 then
-        if npcUtil.completeQuest(player, xi.quest.log_id.JEUNO, xi.quest.id.jeuno.PAINFUL_MEMORY, { item = 16766 }) then
+        if npcUtil.completeQuest(player, xi.questLog.JEUNO, xi.quest.id.jeuno.PAINFUL_MEMORY, { item = 16766 }) then
             player:delKeyItem(xi.ki.MERTAIRES_BRACELET)
             player:setCharVar('TrosKilled', 0)
             player:setCharVar('Tros_Timer', 0)

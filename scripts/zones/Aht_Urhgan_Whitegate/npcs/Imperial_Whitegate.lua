@@ -5,10 +5,8 @@
 -----------------------------------
 local whitegateShared = require('scripts/zones/Aht_Urhgan_Whitegate/Shared')
 -----------------------------------
+---@type TNpcEntity
 local entity = {}
-
-entity.onTrade = function(player, npc, trade)
-end
 
 entity.onTrigger = function(player, npc)
     local noWeapons = player:getEquipID(xi.slot.MAIN) == 0 and player:getEquipID(xi.slot.SUB) == 0
@@ -45,13 +43,13 @@ end
 entity.onEventUpdate = function(player, csid, option, npc)
     if csid == 3140 or csid == 3155 then
         if option == 1 and npcUtil.giveItem(player, xi.item.BALRAHNS_RING) then
-            player:setCharVar('TOAU_RINGTIME', os.time())
+            player:setCharVar('TOAU_RINGTIME', GetSystemTime())
             player:setCharVar('TOAU_RINGRECV', 1)
         elseif option == 2 and npcUtil.giveItem(player, xi.item.ULTHALAMS_RING) then
-            player:setCharVar('TOAU_RINGTIME', os.time())
+            player:setCharVar('TOAU_RINGTIME', GetSystemTime())
             player:setCharVar('TOAU_RINGRECV', 1)
         elseif option == 3 and npcUtil.giveItem(player, xi.item.JALZAHNS_RING) then
-            player:setCharVar('TOAU_RINGTIME', os.time())
+            player:setCharVar('TOAU_RINGTIME', GetSystemTime())
             player:setCharVar('TOAU_RINGRECV', 1)
         elseif option == 4 then
             npcUtil.giveItem(player, xi.item.IMPERIAL_STANDARD)

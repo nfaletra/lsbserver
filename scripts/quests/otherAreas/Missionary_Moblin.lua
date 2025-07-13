@@ -1,9 +1,10 @@
 -----------------------------------
 -- Missionery Moblin
+-- Log ID: 4, Quest ID: 103
 -- Koblakiq !pos -64.851 21.834 -117.521 11
 -----------------------------------
 
-local quest = Quest:new(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.MISSIONARY_MOBLIN)
+local quest = Quest:new(xi.questLog.OTHER_AREAS, xi.quest.id.otherAreas.MISSIONARY_MOBLIN)
 
 quest.reward =
 {
@@ -14,17 +15,12 @@ quest.sections =
 {
     {
         check = function(player, status, vars)
-            return status == QUEST_AVAILABLE
+            return status == xi.questStatus.QUEST_AVAILABLE
         end,
 
         [xi.zone.OLDTON_MOVALPOLOS] =
         {
-            ['Koblakiq'] =
-            {
-                onTrigger = function(player, npc)
-                    return quest:progressCutscene(7)
-                end,
-            },
+            ['Koblakiq'] = quest:progressCutscene(7),
 
             onEventFinish =
             {
@@ -39,15 +35,16 @@ quest.sections =
 
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED
+            return status == xi.questStatus.QUEST_ACCEPTED
         end,
 
         [xi.zone.OLDTON_MOVALPOLOS] =
         {
             ['Koblakiq'] =
+
             {
                 onTrade = function(player, npc, trade)
-                    if npcUtil.tradeHasExactly(trade, xi.item.SOILED_LETTER) then
+                    if npcUtil.tradeHas(trade, xi.item.SOILED_LETTER) then
                         return quest:progressCutscene(9)
                     end
                 end,
@@ -60,24 +57,24 @@ quest.sections =
             onEventFinish =
             {
                 [9] = function(player, csid, option, npc)
-                    quest:complete(player)
+                    if quest:complete(player) then
+                        player:confirmTrade()
+                        quest:setMustZone(player)
+                    end
                 end,
             },
         },
     },
+
     {
         check = function(player, status, vars)
-            return status == QUEST_COMPLETED
+            return status == xi.questStatus.QUEST_COMPLETED and
+                quest:getMustZone(player)
         end,
 
         [xi.zone.OLDTON_MOVALPOLOS] =
         {
-            ['Koblakiq'] =
-            {
-                onTrigger = function(player, npc)
-                    return quest:event(12)
-                end,
-            },
+            ['Koblakiq'] = quest:event(12),
         },
     },
 }

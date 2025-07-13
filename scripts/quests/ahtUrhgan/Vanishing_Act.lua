@@ -5,7 +5,7 @@
 -- Qutiba, Whitegate, !pos 92 -7.5 -130 50
 -----------------------------------
 
-local quest = Quest:new(xi.quest.log_id.AHT_URHGAN, xi.quest.id.ahtUrhgan.VANISHING_ACT)
+local quest = Quest:new(xi.questLog.AHT_URHGAN, xi.quest.id.ahtUrhgan.VANISHING_ACT)
 
 quest.reward =
 {
@@ -17,8 +17,8 @@ quest.sections =
     -- Section: Quest available
     {
         check = function(player, status, vars)
-            return status == QUEST_AVAILABLE and
-                player:hasCompletedQuest(xi.quest.log_id.AHT_URHGAN, xi.quest.id.ahtUrhgan.DELIVERING_THE_GOODS)
+            return status == xi.questStatus.QUEST_AVAILABLE and
+                player:hasCompletedQuest(xi.questLog.AHT_URHGAN, xi.quest.id.ahtUrhgan.DELIVERING_THE_GOODS)
         end,
 
         [xi.zone.AHT_URHGAN_WHITEGATE] =
@@ -26,7 +26,10 @@ quest.sections =
             ['Qutiba'] =
             {
                 onTrigger = function(player, npc)
-                    if quest:getMustZone(player) or quest:getVar(player, 'Stage') > os.time() then
+                    if
+                        quest:getMustZone(player) or
+                        quest:getVar(player, 'Stage') > GetSystemTime()
+                    then
                         return quest:progressEvent(52)
                     else
                         return quest:progressEvent(42) -- Starts Quest
@@ -37,7 +40,7 @@ quest.sections =
             ['Ulamaal'] =
             {
                 onTrigger = function(player, npc)
-                    if player:needToZone() or quest:getVar(player, 'Stage') > os.time() then
+                    if player:needToZone() or quest:getVar(player, 'Stage') > GetSystemTime() then
                         return quest:progressEvent(53)
                     else
                         return quest:progressEvent(42) -- Starts Quest
@@ -67,7 +70,7 @@ quest.sections =
     -- Section: Quest accepted
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED
+            return status == xi.questStatus.QUEST_ACCEPTED
         end,
 
         [xi.zone.AHT_URHGAN_WHITEGATE] =
@@ -167,7 +170,7 @@ quest.sections =
     -- Section: Quest completed
     {
         check = function(player, status, vars)
-            return status == QUEST_COMPLETED
+            return status == xi.questStatus.QUEST_COMPLETED
         end,
 
         [xi.zone.AHT_URHGAN_WHITEGATE] =

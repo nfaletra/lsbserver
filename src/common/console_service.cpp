@@ -21,13 +21,22 @@
 
 #include "console_service.h"
 
+#include "application.h"
+#include "database.h"
+#include "logging.h"
 #include "lua.h"
+#include "settings.h"
+#include "task_manager.h"
+#include "tracy.h"
+#include "utils.h"
+#include "version.h"
 
 #include <sstream>
 
 #ifdef _WIN32
 #include <conio.h>
 #include <io.h>
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #define isatty  _isatty
 #define getchar _getch
@@ -44,7 +53,7 @@ bool stdinHasData()
     // this works by harnessing Windows' black magic:
     return _kbhit();
 #else
-    struct pollfd pollFileDescriptor = { STDIN_FILENO, POLLIN, 0 };
+    pollfd pollFileDescriptor = { STDIN_FILENO, POLLIN, 0 };
 
     // poll the stdin file descriptor until it tells us it's ready
     // poll returns a 0 if STDIN isn't ready, or a 1 if it is.
@@ -60,13 +69,15 @@ bool getLine(std::string& line)
     {
         return false;
     }
+
 #if defined(_WIN32)
-    auto keyCharacter = static_cast<unsigned char>(getchar());
+    const auto keyCharacter = static_cast<unsigned char>(getchar());
     if (keyCharacter == '\r')
     {
         fmt::print("\n"); // Windows needs \r\n for newlines in the console, but the enter key is only \r.
         return true;
     }
+
     if (keyCharacter == '\n')
     {
         return true;
@@ -82,9 +93,9 @@ bool getLine(std::string& line)
         return false;
     }
 
-    fmt::print("{:c}", keyCharacter); // echo character back to console, apparently using ReadConsoleInput & GetStdHandle prevents echo?
     if (std::isprint(keyCharacter))
     {
+        fmt::print("{:c}", keyCharacter); // echo character back to console, apparently using ReadConsoleInput & GetStdHandle prevents echo?
         line += keyCharacter;
     }
 
@@ -95,10 +106,39 @@ bool getLine(std::string& line)
 #endif
 }
 
-ConsoleService::ConsoleService()
+ConsoleService::ConsoleService(Application& application)
+: application_(application)
+, m_consoleThreadRun(true)
+{
+    registerDefaultCommands();
+
+    if (application_.isRunningInCI())
+    {
+        return;
+    }
+
+    run();
+}
+
+ConsoleService::~ConsoleService()
+{
+    m_consoleThreadRun = false;
+    m_consoleStopCondition.notify_all();
+}
+
+// NOTE: If you capture things in this function, make sure they're protected (locked or atomic)!
+// NOTE: If you're going to print, use fmt::print, rather than ShowInfo etc.
+void ConsoleService::registerCommand(std::string const& name, std::string const& description, std::function<void(std::vector<std::string>&)> func)
+{
+    std::lock_guard<std::mutex> lock(m_consoleInputBottleneck);
+
+    m_commands[name] = ConsoleCommand{ name, description, std::move(func) };
+}
+
+void ConsoleService::registerDefaultCommands()
 {
     // clang-format off
-    RegisterCommand("help", "Print a list of available console commands.",
+    registerCommand("help", "Print a list of available console commands",
     [this](std::vector<std::string>& inputs)
     {
         fmt::print("> Available commands:\n");
@@ -108,13 +148,26 @@ ConsoleService::ConsoleService()
         }
     });
 
-    RegisterCommand("tasks", "Show the current amount of tasks registered to the application task manager.",
+    registerCommand("version", "Print the application version",
     [](std::vector<std::string>& inputs)
     {
-        fmt::print("> tasks registered to the application task manager: {}\n", CTaskMgr::getInstance()->getTaskList().size());
+        fmt::print("> Application branch: {}\n", version::GetVersionString());
     });
 
-    RegisterCommand("log_level", "Set the maximum log level to be displayed (available: 0: trace, 1: debug, 2: info, 3: warn)",
+    registerCommand("tasks", "Show the current amount of tasks registered to the application task manager",
+    [](std::vector<std::string>& inputs)
+    {
+        fmt::print("> tasks registered to the application task manager: {}\n", CTaskManager::getInstance()->getTaskList().size());
+    });
+
+    registerCommand("reload_settings", "Reload settings files",
+    [](std::vector<std::string>& inputs)
+    {
+        fmt::print("Reloading settings files\n");
+        settings::init();
+    });
+
+    registerCommand("log_level", "Set the maximum log level to be displayed (available: 0: trace, 1: debug, 2: info, 3: warn)",
     [](std::vector<std::string>& inputs)
     {
         if (inputs.size() >= 2)
@@ -130,7 +183,7 @@ ConsoleService::ConsoleService()
         }
     });
 
-    RegisterCommand("lua", "Provides a Lua REPL",
+    registerCommand("lua", "Provides a Lua REPL",
     [](std::vector<std::string>& inputs)
     {
         if (inputs.size() >= 2)
@@ -139,31 +192,53 @@ ConsoleService::ConsoleService()
             inputs = std::vector<std::string>(inputs.begin() + 1, inputs.end());
 
             auto input = fmt::format("local var = {}; if type(var) ~= \"nil\" then print(var) end", fmt::join(inputs, " "));
+
+            // TODO: Make sure to execute on the main thread
             lua.safe_script(input);
         }
     });
 
-    RegisterCommand("crash", "Crash the process",
+    registerCommand("crash", "Crash the process",
     [](std::vector<std::string>& inputs)
     {
+        // TODO: Make sure to execute on the main thread
         crash();
     });
 
+    registerCommand("throw", "Throw an exception",
+    [](std::vector<std::string>& inputs)
+    {
+        // TODO: Make sure to execute on the main thread
+        throw std::runtime_error("Exception thrown from console command");
+    });
+
+    registerCommand("exit", "Request application exit",
+    [&](std::vector<std::string>& inputs)
+    {
+        application_.requestExit();
+        fmt::print("> Goodbye!");
+    });
+    // clang-format on
+}
+
+void ConsoleService::run()
+{
+    // clang-format off
     bool attached = isatty(0);
     if (attached)
     {
-        ShowInfo("Console input thread is ready...");
-        ShowInfo("Type 'help' for a list of available commands.");
         m_consoleInputThread = nonstd::jthread([&]()
         {
             std::string line;
 
-            while (m_consoleThreadRun)
+            const auto predicate = [&]{ return !m_consoleThreadRun; };
+
+            while (!predicate())
             {
                 std::unique_lock<std::mutex> lock(m_consoleInputBottleneck);
 
                 // https://en.cppreference.com/w/cpp/thread/condition_variable/wait_for
-                if (!m_consoleStopCondition.wait_for(lock, 50ms, [&]{ return !m_consoleThreadRun; }))
+                if (!m_consoleStopCondition.wait_for(lock, 50ms, predicate))
                 {
                     if (!getLine(line))
                     {
@@ -189,6 +264,7 @@ ConsoleService::ConsoleService()
                         auto entry = m_commands.find(inputs[0]);
                         if (entry != m_commands.end())
                         {
+                            // TODO: Execute this on the main thread, not the worker thread
                             entry->second.func(inputs);
                         }
                         else
@@ -200,28 +276,7 @@ ConsoleService::ConsoleService()
                     line = std::string();
                 }
             }
-            fmt::print("Console input thread exiting...\n");
         });
     }
     // clang-format on
-}
-
-ConsoleService::~ConsoleService()
-{
-    stop();
-    m_consoleStopCondition.notify_all();
-}
-
-// NOTE: If you capture things in this function, make sure they're protected (locked or atomic)!
-// NOTE: If you're going to print, use fmt::print, rather than ShowInfo etc.
-void ConsoleService::RegisterCommand(std::string const& name, std::string const& description, std::function<void(std::vector<std::string>&)> func)
-{
-    std::lock_guard<std::mutex> lock(m_consoleInputBottleneck);
-
-    m_commands[name] = ConsoleCommand{ name, description, std::move(func) };
-}
-
-void ConsoleService::stop()
-{
-    m_consoleThreadRun = false;
 }

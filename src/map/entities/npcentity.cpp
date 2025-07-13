@@ -19,13 +19,15 @@
 ===========================================================================
 */
 
-#include "common/taskmgr.h"
+#include "npcentity.h"
 
 #include "ai/ai_container.h"
-#include "npcentity.h"
-#include "utils/zoneutils.h"
+
+#include "common/task_manager.h"
 
 #include "packets/entity_update.h"
+
+#include "utils/zoneutils.h"
 
 /************************************************************************
  *                                                                       *
@@ -38,6 +40,7 @@ CNpcEntity::CNpcEntity()
 , name_prefix(0)
 , widescan(1)
 {
+    TracyZoneScoped;
     objtype    = TYPE_NPC;
     look.face  = 0x32;
     allegiance = ALLEGIANCE_TYPE::MOB;
@@ -45,7 +48,10 @@ CNpcEntity::CNpcEntity()
     PAI = std::make_unique<CAIContainer>(this);
 }
 
-CNpcEntity::~CNpcEntity() = default;
+CNpcEntity::~CNpcEntity()
+{
+    TracyZoneScoped;
+}
 
 uint32 CNpcEntity::getEntityFlags() const
 {
@@ -103,7 +109,7 @@ bool CNpcEntity::isWideScannable()
 
 void CNpcEntity::PostTick()
 {
-    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    timer::time_point now = timer::now();
     if (loc.zone && updatemask && status != STATUS_TYPE::DISAPPEAR && now > m_nextUpdateTimer)
     {
         m_nextUpdateTimer = now + 250ms;

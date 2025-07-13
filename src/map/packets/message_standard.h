@@ -29,12 +29,9 @@
 // Valid MessageIDs for both standard and SYSTEM type messages
 // Found in ROM/27/76.dat or 1-27-76.xml if using mass extractor
 // Todo: move msg enums to common location out of packet headers
-enum class MsgStd
+enum class MsgStd : uint16
 {
-    // Used as a sentinel value. This should not be used as part of a packet.
-    Unknown = -1,
-
-    // Keep message IDs in order OR ELSE UNSPECIFIED CONSQUENSES SHALL ENSUE
+    // Keep message IDs in order OR ELSE UNSPECIFIED CONSEQUENCES SHALL ENSUE
 
     CouldNotEnter                = 2,   // You could not enter the next area. [0,1,3,4, all same message]
     CouldNotEnterYourRoom        = 5,   // You could not enter your room.
@@ -65,6 +62,9 @@ enum class MsgStd
     LinkshellUnavailable         = 112, // The linkshell name you entered is already in use or otherwise unavailable.
     EventSkipped                 = 117, // Event skipped.
     TellNotReceivedOffline       = 125, // Your tell was not received.  The recipient is currently away.
+    MooglePlantsSeeds            = 132, // Your moogle plants the <seed> in the flowerpot.
+    MoogleDriesPlant             = 133, // Your moogle dries the plant in the <item>.
+    MoogleUsesItemOnPLant        = 136, // Your moogle uses the <item> on the plant.
     MoghouseCantPickUp           = 137, // Kupo... I can't pick anything right now, kupo.
     ChocoboRefusedToEnte         = 138, // The chocobo refused to enter the next area.
     CurrentPollResultsSystem     = 140, // Player Name's proposal - Current poll results:
@@ -89,6 +89,8 @@ enum class MsgStd
     UnableToProcessRequest       = 183, // Unable to process request.
     ExpansionPackNotRegistered   = 184, // Unable to enter next area. Expansion pack not registered.
     ExpansionPackNotInstalled    = 185, // Unable to enter next area. Expansion pack not installed.
+    GainsEffect                  = 205, // Player Name gains the effect of <effect>.
+    EffectWearsOff               = 206, // Player Name's <effect> wears off.
     CannotPerformPetra           = 209, // You cannot perform that action while holding a Petra.
     CannotPerformNoPetra         = 210, // You cannot perform that action without a Petra.
     LostYourPetras               = 211, // You lost your Petras.
@@ -110,6 +112,7 @@ enum class MsgStd
     LevelSyncWarning             = 235, // Warning! This is a Level Sync party ...
     CannotInviteLevelSync        = 236, // You cannot invite that person at this time. This player is either undergoing Level Sync...
     CannotJoinLevelSync          = 237, // You cannot join this party.  You are either undergoing Level Sync...
+    LevelSyncSet                 = 238, // The party's level has been restricted to <level>.
     Compass                      = 239, // The compass reads: ...
     CannotHere                   = 256, // You cannot use that command in this area.
     HeadgearShow                 = 260,
@@ -133,6 +136,23 @@ enum class MsgStd
     TrustEnmity                  = 300, // You cannot use Trust magic while having gained enmity.
     TrustSoloOrLeader            = 301, // You cannot use Trust magic unless you are solo or the party leader.
     AnErrorHasOccured            = 308, // An error has occurred.
+    UnableToThrowAway            = 325, // You are unable to throw away the <item>.
+    LevelSyncActivated           = 540, // Level Sync activated. Your level has been restricted to <Level>. Equipment effected by the level restriction will be adjusted accordingly. Experience...
+    LevelSyncDesigneeBelowMin    = 541, // Level Sync could not be activated. The designated player is below level 10.
+    LevelSyncDesigneeInOtherArea = 542, // Level Sync could not be activated. The designated player is in a different area.
+    LevelSyncPreventedByStatus   = 543, // Level Sync could not be activated. One or more party members are currently under the effect of a status which prevents synchronization.
+    LevelSyncWillBeRemoved       = 544, // Level synchronization will be removed in x seconds.
+    LevelSyncNoExpTooFarOrUnc    = 545, // No experience points gained... The Level Sync designee is either too far from the enemy, or unconcious.
+    LevelSyncIneligibleForExp    = 548, // The party member you selected is incapable of receiving experience points, and as such cannot be a Level Sync designee.
+    LevelSyncNoExpIneligible     = 549, // No experience points gained... The Level Sync designee is incapable of receiving experience points.
+    LevelSyncDeactivateForStatus = 550, // Level sync will be deactivated in 30 seconds. One or more party members have received the effect of a status which prevents synchronization.
+    LevelSyncDeactivateLeftArea  = 551, // Level sync will be deactivated in 30 seconds. The party leader or the Level Sync designee has left the area.
+    LevelSyncRemoveTooFewMembers = 552, // Level sync will be deactivated in 30 seconds. Less than two party members fulfill the requirements for Level Sync.
+    LevelSyncRemoveLeftParty     = 553, // Level sync will be deactivated in 30 seconds. The party leader has removed synchronization, or the Level Sync designee has left the party.
+    LevelSyncRemoveLowLevel      = 554, // Level sync will be deactivated in 30 seconds. The Level Sync designee has fallen below level 10.
+    LevelSyncRemoveJobChange     = 555, // Level sync will be deactivated in 30 seconds. A party member has undergone a job change.
+    LevelSyncRemoveIneligibleExp = 556, // Level sync will be deactivated in 30 seconds. The Level Sync designee is incapable of receiving experience points.
+    TreasureHunterProc           = 603, // Additional effect: Treasure Hunter effectiveness against <Target> increases to <number>
 };
 
 class CCharEntity;
@@ -144,7 +164,7 @@ public:
     CMessageStandardPacket(uint16 MessageID);
 
     CMessageStandardPacket(MsgStd MessageID);
-    CMessageStandardPacket(uint32 param0, uint16 MessageID);
+    CMessageStandardPacket(uint32 param0, MsgStd MessageID);
     CMessageStandardPacket(uint32 param0, uint32 param1, uint16 MessageID);
     CMessageStandardPacket(CCharEntity* PChar, uint32 param0, MsgStd MessageID);
     CMessageStandardPacket(CCharEntity* PChar, uint32 param0, uint32 param1, MsgStd MessageID);

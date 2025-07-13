@@ -2,6 +2,7 @@
 -- Dragoon Job Utilities
 -----------------------------------
 require('scripts/globals/ability')
+require('scripts/globals/combat/magic_hit_rate')
 require('scripts/globals/jobpoints')
 require('scripts/globals/spells/damage_spell')
 require('scripts/globals/weaponskills')
@@ -133,7 +134,7 @@ xi.job_utils.dragoon.abilityCheckRequiresPet = function(player, target, ability,
         end
 
         if ability:getID() == xi.jobAbility.SPIRIT_SURGE then
-            ability:setRecast(ability:getRecast() - player:getMod(xi.mod.ONE_HOUR_RECAST))
+            ability:setRecast(math.max(0, ability:getRecast() - player:getMod(xi.mod.ONE_HOUR_RECAST) * 60))
         end
 
         return 0, 0
@@ -229,6 +230,8 @@ xi.job_utils.dragoon.useAncientCircle = function(player, target, ability)
     if player:getMainJob() == xi.job.DRG then
         power = 15 + jpValue
     end
+
+    power = power + player:getMod(xi.mod.ANCIENT_CIRCLE_POTENCY)
 
     target:addStatusEffect(xi.effect.ANCIENT_CIRCLE, power, 0, duration)
 end
@@ -512,7 +515,10 @@ end
 
 xi.job_utils.dragoon.useDeepBreathing = function(player, target, ability)
     local wyvern = getWyvern(player)
-    wyvern:addStatusEffect(xi.effect.MAGIC_ATK_BOOST, 0, 0, 180) -- Message when effect is lost is 'Magic Attack boost wears off.'
+
+    if wyvern then
+        wyvern:addStatusEffect(xi.effect.MAGIC_ATK_BOOST, 0, 0, 180) -- Message when effect is lost is 'Magic Attack boost wears off.'
+    end
 end
 
 xi.job_utils.dragoon.useSpiritBond = function(player, target, ability)
@@ -683,14 +689,19 @@ xi.job_utils.dragoon.useDamageBreath = function(wyvern, target, skill, action, d
         wyvern:addTP(strafeMeritPower * 5) -- add 50 TP per merit with augmented AF2 legs
     end
 
-    local bonusMacc = strafeMeritPower + master:getMod(xi.mod.WYVERN_BREATH_MACC)
-    local element   = damageType - xi.damageType.ELEMENTAL
+    local bonusMacc          = strafeMeritPower + master:getMod(xi.mod.WYVERN_BREATH_MACC)
+    local element            = damageType - xi.damageType.ELEMENTAL
+    local _, skillchainCount = xi.magicburst.formMagicBurst(element, target)
 
     -- 'Breath accuracy is directly affected by a wyvern's current HP', but no data exists.
-    local resist              = xi.spells.damage.calculateResist(wyvern, target, 0, 0, element, 0, bonusMacc)
+    local resist              = xi.combat.magicHitRate.calculateResistRate(wyvern, target, 0, 0, 0, element, 0, 0, bonusMacc)
     local sdt                 = xi.spells.damage.calculateSDT(target, element)
-    local magicBurst          = xi.spells.damage.calculateIfMagicBurst(target, element)
     local nukeAbsorbOrNullify = xi.spells.damage.calculateNukeAbsorbOrNullify(target, element)
+    local magicBurst          = 1
+
+    if skillchainCount > 0 then
+        magicBurst = xi.spells.damage.calculateIfMagicBurst(target, element, skillchainCount)
+    end
 
     -- It appears that MB breaths don't do more damage based on testing.
     damage = damage * resist * sdt * nukeAbsorbOrNullify

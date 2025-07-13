@@ -7,27 +7,27 @@ zones[xi.zone.ARRAPAGO_REMNANTS] =
 {
     text =
     {
-        ITEM_CANNOT_BE_OBTAINED       = 6384, -- You cannot obtain the <item>. Come back after sorting your inventory.
-        FULL_INVENTORY_AFTER_TRADE    = 6388, -- You cannot obtain the <item>. Try trading again after sorting your inventory.
-        ITEM_OBTAINED                 = 6390, -- Obtained: <item>.
-        GIL_OBTAINED                  = 6391, -- Obtained <number> gil.
-        KEYITEM_OBTAINED              = 6393, -- Obtained key item: <keyitem>.
-        KEYITEM_LOST                  = 6394, -- Lost key item: <keyitem>.
-        NOT_HAVE_ENOUGH_GIL           = 6395, -- You do not have enough gil.
-        ITEMS_OBTAINED                = 6399, -- You obtain <number> <item>!
-        CARRIED_OVER_POINTS           = 7001, -- You have carried over <number> login point[/s].
-        LOGIN_CAMPAIGN_UNDERWAY       = 7002, -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!
-        LOGIN_NUMBER                  = 7003, -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
-        MEMBERS_LEVELS_ARE_RESTRICTED = 7023, -- Your party is unable to participate because certain members' levels are restricted.
-        CELL_OFFSET                   = 7221, -- Main Weapon/Sub-Weapon restriction removed.
-        SALVAGE_START                 = 7244, -- You feel an incredible pressure bearing down on you. This area appears to be blanketed in some sort of intense psionic field...
-        TIME_TO_COMPLETE              = 7451, -- You have <number> [minute/minutes] (Earth time) to complete this mission.
-        MISSION_FAILED                = 7452, -- The mission has failed. Leaving area.
-        TIME_REMAINING_MINUTES        = 7456, -- ime remaining: <number> [minute/minutes] (Earth time).
-        TIME_REMAINING_SECONDS        = 7457, -- ime remaining: <number> [second/seconds] (Earth time).
-        PARTY_FALLEN                  = 7459, -- ll party members have fallen in battle. Mission failure in <number> [minute/minutes].
-        DOOR_IS_SEALED                = 7470, -- The door is sealed...
-        DOOR_IS_SEALED_MYSTERIOUS     = 7473, -- The door is sealed by some mysterious force...
+        ITEM_CANNOT_BE_OBTAINED       = 6385, -- You cannot obtain the <item>. Come back after sorting your inventory.
+        FULL_INVENTORY_AFTER_TRADE    = 6389, -- You cannot obtain the <item>. Try trading again after sorting your inventory.
+        ITEM_OBTAINED                 = 6391, -- Obtained: <item>.
+        GIL_OBTAINED                  = 6392, -- Obtained <number> gil.
+        KEYITEM_OBTAINED              = 6394, -- Obtained key item: <keyitem>.
+        KEYITEM_LOST                  = 6395, -- Lost key item: <keyitem>.
+        NOT_HAVE_ENOUGH_GIL           = 6396, -- You do not have enough gil.
+        ITEMS_OBTAINED                = 6400, -- You obtain <number> <item>!
+        CARRIED_OVER_POINTS           = 7002, -- You have carried over <number> login point[/s].
+        LOGIN_CAMPAIGN_UNDERWAY       = 7003, -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!
+        LOGIN_NUMBER                  = 7004, -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
+        MEMBERS_LEVELS_ARE_RESTRICTED = 7024, -- Your party is unable to participate because certain members' levels are restricted.
+        CELL_OFFSET                   = 7227, -- Main Weapon/Sub-Weapon restriction removed.
+        SALVAGE_START                 = 7250, -- You feel an incredible pressure bearing down on you. This area appears to be blanketed in some sort of intense psionic field...
+        TIME_TO_COMPLETE              = 7457, -- You have <number> [minute/minutes] (Earth time) to complete this mission.
+        MISSION_FAILED                = 7458, -- The mission has failed. Leaving area.
+        TIME_REMAINING_MINUTES        = 7462, -- ime remaining: <number> [minute/minutes] (Earth time).
+        TIME_REMAINING_SECONDS        = 7463, -- ime remaining: <number> [second/seconds] (Earth time).
+        PARTY_FALLEN                  = 7465, -- ll party members have fallen in battle. Mission failure in <number> [minute/minutes].
+        DOOR_IS_SEALED                = 7476, -- The door is sealed...
+        DOOR_IS_SEALED_MYSTERIOUS     = 7479, -- The door is sealed by some mysterious force...
     },
     mob =
     {
@@ -204,7 +204,7 @@ zones[xi.zone.ARRAPAGO_REMNANTS] =
         {
             [1] =
             {
-                DOOR1 = 17080974,
+                DOOR1 = 17080975,
             },
 
             [2] =
@@ -214,10 +214,10 @@ zones[xi.zone.ARRAPAGO_REMNANTS] =
 
             [3] =
             {
-                DOOR1 = 17080975,
-                DOOR2 = 17080976,
-                DOOR3 = 17080977,
-                DOOR4 = 17080978,
+                DOOR1 = 17080976,
+                DOOR2 = 17080977,
+                DOOR3 = 17080978,
+                DOOR4 = 17080979,
             },
         },
 
@@ -225,10 +225,10 @@ zones[xi.zone.ARRAPAGO_REMNANTS] =
         {
             [1] =
             {
-                DOOR1 = 17080979,
-                DOOR2 = 17080980,
-                DOOR3 = 17080981,
-                DOOR4 = 17080982,
+                DOOR1 = 17080980,
+                DOOR2 = 17080981,
+                DOOR3 = 17080982,
+                DOOR4 = 17080983,
             },
 
             [2] =
@@ -242,8 +242,8 @@ zones[xi.zone.ARRAPAGO_REMNANTS] =
         {
             [1] =
             {
-                DOOR1 = 17080983,
-                DOOR2 = 17080984,
+                DOOR1 = 17080984,
+                DOOR2 = 17080985,
             },
         },
 
@@ -251,8 +251,8 @@ zones[xi.zone.ARRAPAGO_REMNANTS] =
         {
             [1] =
             {
-                DOOR1 = 17080985,
-                DOOR2 = 17080986,
+                DOOR1 = 17080986,
+                DOOR2 = 17080987,
             },
         },
 
@@ -260,14 +260,14 @@ zones[xi.zone.ARRAPAGO_REMNANTS] =
         {
             [1] =
             {
-                DOOR1 = 17080987,
-                DOOR2 = 17080988,
+                DOOR1 = 17080988,
+                DOOR2 = 17080989,
             },
         },
 
         [6] =
         {
-            DOOR = 17080989,
+            DOOR = 17080990,
         },
     },
 

@@ -10,44 +10,34 @@ zones[xi.zone.LOWER_DELKFUTTS_TOWER] =
         CONQUEST_BASE                    = 0,     -- Tallying conquest results...
         THE_DOOR_IS_FIRMLY_SHUT_OPEN_KEY = 159,   -- The door is firmly shut. You might be able to open it if you had the key.
         DOOR_FIRMLY_SHUT                 = 160,   -- The door is firmly shut.
-        ITEM_CANNOT_BE_OBTAINED          = 6573,  -- You cannot obtain the <item>. Come back after sorting your inventory.
-        ITEM_OBTAINED                    = 6579,  -- Obtained: <item>.
-        GIL_OBTAINED                     = 6580,  -- Obtained <number> gil.
-        KEYITEM_OBTAINED                 = 6582,  -- Obtained key item: <keyitem>.
-        FELLOW_MESSAGE_OFFSET            = 6608,  -- I'm ready. I suppose.
-        CARRIED_OVER_POINTS              = 7190,  -- You have carried over <number> login point[/s].
-        LOGIN_CAMPAIGN_UNDERWAY          = 7191,  -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!
-        LOGIN_NUMBER                     = 7192,  -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
-        MEMBERS_LEVELS_ARE_RESTRICTED    = 7212,  -- Your party is unable to participate because certain members' levels are restricted.
-        FISHING_MESSAGE_OFFSET           = 7250,  -- You can't fish here.
-        SOMETHING_HUGE_BEARING_DOWN      = 7498,  -- Something huge is bearing down upon you!
-        PLAYER_OBTAINS_ITEM              = 8633,  -- <name> obtains <item>!
-        UNABLE_TO_OBTAIN_ITEM            = 8634,  -- You were unable to obtain the item.
-        PLAYER_OBTAINS_TEMP_ITEM         = 8635,  -- <name> obtains the temporary item: <item>!
-        ALREADY_POSSESS_TEMP             = 8636,  -- You already possess that temporary item.
-        NO_COMBINATION                   = 8641,  -- You were unable to enter a combination.
-        REGIME_REGISTERED                = 10719, -- New training regime registered!
-        LEARNS_SPELL                     = 11767, -- <name> learns <spell>!
-        UNCANNY_SENSATION                = 11769, -- You are assaulted by an uncanny sensation.
-        COMMON_SENSE_SURVIVAL            = 11776, -- It appears that you have arrived at a new survival guide provided by the Adventurers' Mutual Aid Network. Common sense dictates that you should now be able to teleport here from similar tomes throughout the world.
+        ITEM_CANNOT_BE_OBTAINED          = 6574,  -- You cannot obtain the <item>. Come back after sorting your inventory.
+        ITEM_OBTAINED                    = 6580,  -- Obtained: <item>.
+        GIL_OBTAINED                     = 6581,  -- Obtained <number> gil.
+        KEYITEM_OBTAINED                 = 6583,  -- Obtained key item: <keyitem>.
+        NOTHING_OUT_OF_ORDINARY          = 6594,  -- There is nothing out of the ordinary here.
+        FELLOW_MESSAGE_OFFSET            = 6609,  -- I'm ready. I suppose.
+        CARRIED_OVER_POINTS              = 7191,  -- You have carried over <number> login point[/s].
+        LOGIN_CAMPAIGN_UNDERWAY          = 7192,  -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!
+        LOGIN_NUMBER                     = 7193,  -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
+        MEMBERS_LEVELS_ARE_RESTRICTED    = 7213,  -- Your party is unable to participate because certain members' levels are restricted.
+        FISHING_MESSAGE_OFFSET           = 7257,  -- You can't fish here.
+        SOMETHING_HUGE_BEARING_DOWN      = 7505,  -- Something huge is bearing down upon you!
+        PLAYER_OBTAINS_ITEM              = 8640,  -- <name> obtains <item>!
+        UNABLE_TO_OBTAIN_ITEM            = 8641,  -- You were unable to obtain the item.
+        PLAYER_OBTAINS_TEMP_ITEM         = 8642,  -- <name> obtains the temporary item: <item>!
+        ALREADY_POSSESS_TEMP             = 8643,  -- You already possess that temporary item.
+        NO_COMBINATION                   = 8648,  -- You were unable to enter a combination.
+        REGIME_REGISTERED                = 10726, -- New training regime registered!
+        LEARNS_SPELL                     = 11774, -- <name> learns <spell>!
+        UNCANNY_SENSATION                = 11776, -- You are assaulted by an uncanny sensation.
+        COMMON_SENSE_SURVIVAL            = 11783, -- It appears that you have arrived at a new survival guide provided by the Adventurers' Mutual Aid Network. Common sense dictates that you should now be able to teleport here from similar tomes throughout the world.
     },
     mob =
     {
-        HIPPOLYTOS_PH =
-        {
-            [17531000] = 17530999, -- 337.079 -16.1 17.386
-            [17531002] = 17530999, -- 346.244 -16.126 10.373
-        },
-        EPIALTES_PH   =
-        {
-            [17530882] = 17530881, -- 432.952 -0.350 -3.719
-            [17530887] = 17530881, -- 484.735 0.046 23.048
-        },
-        EURYMEDON_PH  =
-        {
-            [17531118] = 17531114, -- 397.252 -32.128 -32.807
-        },
-        DISASTER_IDOL = 17531121,
+        HIPPOLYTOS    = GetFirstID('Hippolytos'),
+        EPIALTES      = GetFirstID('Epialtes'),
+        EURYMEDON     = GetFirstID('Eurymedon'),
+        DISASTER_IDOL = GetFirstID('Disaster_Idol'),
     },
     npc =
     {

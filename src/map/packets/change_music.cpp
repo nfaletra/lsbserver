@@ -19,11 +19,9 @@
 ===========================================================================
 */
 
-#include "common/socket.h"
-
 #include "change_music.h"
 
-CChangeMusicPacket::CChangeMusicPacket(uint8 BlockID, uint8 MusicTrackID)
+CChangeMusicPacket::CChangeMusicPacket(uint16 BlockID, uint16 MusicTrackID)
 {
     // Block IDs:
     // 0 Background Music (Day time, 7:00 -> 18:00)
@@ -35,6 +33,6 @@ CChangeMusicPacket::CChangeMusicPacket(uint8 BlockID, uint8 MusicTrackID)
     this->setType(0x5F);
     this->setSize(0x08);
 
-    ref<uint8>(0x04) = BlockID;      // block
-    ref<uint8>(0x06) = MusicTrackID; // music
+    ref<uint16>(0x04) = BlockID;      // block
+    ref<uint16>(0x06) = MusicTrackID; // music
 }

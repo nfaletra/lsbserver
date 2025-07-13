@@ -7,13 +7,50 @@
 local ruludeID = zones[xi.zone.RULUDE_GARDENS]
 -----------------------------------
 
-local quest = Quest:new(xi.quest.log_id.JEUNO, xi.quest.id.jeuno.SHATTERING_STARS)
+local quest = Quest:new(xi.questLog.JEUNO, xi.quest.id.jeuno.SHATTERING_STARS)
 
 quest.reward =
 {
-    fame = 80,
-    fameArea = xi.quest.fame_area.JEUNO,
-    title = xi.title.STAR_BREAKER,
+    fame     = 80,
+    fameArea = xi.fameArea.JEUNO,
+    title    = xi.title.STAR_BREAKER,
+}
+
+local maatBattlefieldIds =
+{
+    [xi.zone.BALGAS_DAIS]        = { 101, 102, 103 },
+    [xi.zone.CHAMBER_OF_ORACLES] = { 194, 195, 196 },
+    [xi.zone.HORLAIS_PEAK]       = {   5,   6,   7 },
+    [xi.zone.QUBIA_ARENA]        = { 517, 518, 519 },
+    [xi.zone.WAUGHROON_SHRINE]   = {  70,  71,  72 },
+}
+
+local maatBattlefieldZone =
+{
+    onEventFinish =
+    {
+        [32001] = function(player, csid, option, npc)
+            local battlefieldWin = player:getLocalVar('battlefieldWin')
+
+            for _, battlefieldId in ipairs(maatBattlefieldIds[player:getZoneID()]) do
+                if battlefieldWin == battlefieldId then
+                    local jobId        = player:getMainJob()
+                    local maatsCapMask = player:getCharVar('maatsCap')
+
+                    if player:getQuestStatus(xi.questLog.JEUNO, xi.quest.id.jeuno.SHATTERING_STARS) == xi.questStatus.QUEST_ACCEPTED then
+                        npcUtil.giveItem(player, xi.item.SCROLL_OF_INSTANT_WARP)
+                        quest:setVar(player, 'Prog', jobId)
+                    end
+
+                    if not utils.mask.getBit(maatsCapMask, jobId - 1) then
+                        player:setCharVar('maatsCap', utils.mask.setBit(maatsCapMask, jobId - 1, true))
+                    end
+
+                    player:addTitle(xi.title.MAAT_MASHER)
+                end
+            end
+        end,
+    },
 }
 
 quest.sections =
@@ -21,7 +58,7 @@ quest.sections =
     -- Section: Quest available.
     {
         check = function(player, status, vars)
-            return status == QUEST_AVAILABLE and
+            return status == xi.questStatus.QUEST_AVAILABLE and
                 player:getMainJob() <= 15 and -- Only the "old" jobs may start this quest.
                 player:getMainLvl() >= 66 and
                 player:getLevelCap() == 70 and
@@ -49,7 +86,7 @@ quest.sections =
     -- Section: Quest accepted.
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED and
+            return status == xi.questStatus.QUEST_ACCEPTED and
                 player:getMainJob() <= 15 and
                 player:getMainLvl() >= 66
         end,
@@ -58,22 +95,27 @@ quest.sections =
         {
             ['Maat'] =
             {
-                onTrigger = function(player, npc)
-                    if quest:getVar(player, 'Prog') >= 1 then
-                        return quest:progressEvent(93) -- Complete quest.
-                    elseif quest:getVar(player, 'Prog') == 0 then
-                        return quest:event(91, player:getMainJob())
-                    end
-                end,
-
                 onTrade = function(player, npc, trade)
-                    local properTestimony = xi.item.WARRIORS_TESTIMONY + player:getMainJob() - 1
+                    local playerJob       = player:getMainJob()
+                    local properTestimony = xi.item.WARRIORS_TESTIMONY + playerJob - 1
 
                     if
                         npcUtil.tradeHasExactly(trade, properTestimony) and
                         quest:getVar(player, 'Prog') == 0
                     then
-                        return quest:progressEvent(64, player:getMainJob())
+                        return quest:progressEvent(64, playerJob)
+                    end
+                end,
+
+                onTrigger = function(player, npc)
+                    local playerJob = player:getMainJob()
+
+                    if quest:getVar(player, 'Prog') >= 1 then
+                        return quest:progressEvent(93) -- Complete quest.
+                    elseif quest:getVar(player, 'tradedTestimony') == 0 then
+                        return quest:event(91, playerJob) -- Testimony never traded.
+                    else
+                        return quest:event(63, playerJob) -- Testimony traded at least once.
                     end
                 end,
             },
@@ -81,6 +123,9 @@ quest.sections =
             onEventFinish =
             {
                 [64] = function(player, csid, option, npc)
+                    quest:setVar(player, 'tradedTestimony', 1)
+
+                    -- Accept teleport.
                     if option == 1 then
                         local mJob = player:getMainJob()
                         if mJob == xi.job.MNK or mJob == xi.job.WHM or mJob == xi.job.SMN then
@@ -105,6 +150,20 @@ quest.sections =
                 end,
             },
         },
+    },
+
+    {
+        check = function(player, status, vars)
+            return status >= xi.questStatus.QUEST_ACCEPTED and
+                player:getMainJob() <= 15 and
+                player:getMainLvl() >= 66
+        end,
+
+        [xi.zone.BALGAS_DAIS]        = maatBattlefieldZone,
+        [xi.zone.CHAMBER_OF_ORACLES] = maatBattlefieldZone,
+        [xi.zone.HORLAIS_PEAK]       = maatBattlefieldZone,
+        [xi.zone.QUBIA_ARENA]        = maatBattlefieldZone,
+        [xi.zone.WAUGHROON_SHRINE]   = maatBattlefieldZone,
     },
 }
 

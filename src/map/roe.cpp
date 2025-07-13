@@ -21,11 +21,7 @@
 
 #include "roe.h"
 
-#include "common/vana_time.h"
-
-#include <ctime>
-
-#include "common/vana_time.h"
+#include "common/timer.h"
 #include "lua/luautils.h"
 #include "packets/chat_message.h"
 #include "utils/charutils.h"
@@ -36,7 +32,7 @@
 #include "packets/roe_sparkupdate.h"
 #include "packets/roe_update.h"
 
-#define ROE_CACHETIME 15
+#define ROE_CACHETIME 15s
 
 std::array<RoeCheckHandler, ROE_NONE> RoeHandlers;
 RoeSystemData                         roeutils::RoeSystem;
@@ -44,7 +40,7 @@ RoeSystemData                         roeutils::RoeSystem;
 void SaveEminenceDataNice(CCharEntity* PChar)
 {
     TracyZoneScoped;
-    if (PChar->m_eminenceCache.lastWriteout < time(nullptr) - ROE_CACHETIME)
+    if (PChar->m_eminenceCache.lastWriteout < timer::now() - ROE_CACHETIME)
     {
         charutils::SaveEminenceData(PChar);
     }
@@ -74,7 +70,7 @@ void call_onRecordTrigger(CCharEntity* PChar, uint16 recordID, const RoeDatagram
         }
         else if (auto PMob = std::get_if<CMobEntity*>(&datagram.data))
         {
-            params[datagram.luaKey] = CLuaBaseEntity(*PMob);
+            params[datagram.luaKey] = *PMob;
         }
         else if (auto text = std::get_if<std::string>(&datagram.data))
         {
@@ -87,7 +83,7 @@ void call_onRecordTrigger(CCharEntity* PChar, uint16 recordID, const RoeDatagram
     }
 
     // Call
-    auto result = onRecordTrigger(CLuaBaseEntity(PChar), recordID, params);
+    auto result = onRecordTrigger(PChar, recordID, params);
     if (!result.valid())
     {
         sol::error err = result;
@@ -258,17 +254,17 @@ namespace roeutils
 
         for (int i = 0; i < 4; i++)
         {
-            PChar->pushPacket(new CRoeQuestLogPacket(PChar, i));
+            PChar->pushPacket<CRoeQuestLogPacket>(PChar, i);
         }
 
         charutils::SaveEminenceData(PChar);
     }
 
-    bool GetEminenceRecordCompletion(CCharEntity* PChar, uint16 recordID)
+    bool GetEminenceRecordCompletion(const CCharEntity* PChar, uint16 recordID)
     {
         TracyZoneScoped;
-        uint16 page = recordID / 8;
-        uint8  bit  = recordID % 8;
+        const uint16 page = recordID / 8;
+        const uint8  bit  = recordID % 8;
         return PChar->m_eminenceLog.complete[page] & (1 << bit);
     }
 
@@ -304,21 +300,11 @@ namespace roeutils
         if (!roeutils::RoeSystem.ImplementedRecords.test(recordID))
         {
             std::string message = "The record #" + std::to_string(recordID) + " is not implemented at this time.";
-            PChar->pushPacket(new CChatMessagePacket(PChar, MESSAGE_NS_SAY, message, "RoE System"));
+            PChar->pushPacket<CChatMessagePacket>(PChar, MESSAGE_NS_SAY, message, "RoE System");
             return false;
         }
 
-        // Prevent packet-injection for re-taking completed records which aren't marked repeatable.
-        if (roeutils::GetEminenceRecordCompletion(PChar, recordID) && !roeutils::RoeSystem.RepeatableRecords.test(recordID))
-        {
-            return false;
-        }
-
-        // Prevent packet-injection from taking timed records as normal ones.
-        if (roeutils::RoeSystem.TimedRecords.test(recordID))
-        {
-            return false;
-        }
+        // There used to be packet injection prevention code here, but it is now part of the packet handler
 
         for (int i = 0; i < 30; i++)
         {
@@ -327,8 +313,8 @@ namespace roeutils
                 PChar->m_eminenceLog.active[i] = recordID;
                 PChar->m_eminenceCache.activemap.set(recordID);
 
-                PChar->pushPacket(new CRoeUpdatePacket(PChar));
-                PChar->pushPacket(new CMessageBasicPacket(PChar, PChar, recordID, 0, MSGBASIC_ROE_START));
+                PChar->pushPacket<CRoeUpdatePacket>(PChar);
+                PChar->pushPacket<CMessageBasicPacket>(PChar, PChar, recordID, 0, MSGBASIC_ROE_START);
                 charutils::SaveEminenceData(PChar);
                 return true;
             }
@@ -356,7 +342,7 @@ namespace roeutils
                     std::swap(PChar->m_eminenceLog.active[j], PChar->m_eminenceLog.active[j + 1]);
                     std::swap(PChar->m_eminenceLog.progress[j], PChar->m_eminenceLog.progress[j + 1]);
                 }
-                PChar->pushPacket(new CRoeUpdatePacket(PChar));
+                PChar->pushPacket<CRoeUpdatePacket>(PChar);
                 charutils::SaveEminenceData(PChar);
                 return true;
             }
@@ -396,7 +382,7 @@ namespace roeutils
                 }
 
                 PChar->m_eminenceLog.progress[i] = progress;
-                PChar->pushPacket(new CRoeUpdatePacket(PChar));
+                PChar->pushPacket<CRoeUpdatePacket>(PChar);
                 SaveEminenceDataNice(PChar);
                 return true;
             }
@@ -427,7 +413,7 @@ namespace roeutils
 
         if (sendUpdate)
         {
-            PChar->pushPacket(new CCharSpellsPacket(PChar));
+            PChar->pushPacket<CCharSpellsPacket>(PChar);
         }
     }
 
@@ -451,38 +437,35 @@ namespace roeutils
         // Only chars with First Step Forward complete can get timed/daily records
         if (GetEminenceRecordCompletion(PChar, 1))
         {
-            time_t lastOnline      = PChar->lastOnline;
-            time_t lastJstMidnight = CVanaTime::getInstance()->getJstMidnight() - (60 * 60 * 24); // Unix timestamp of the last JST midnight
+            auto currentTime     = earth_time::now();
+            auto lastJstMidnight = earth_time::jst::get_next_midnight(currentTime) - 24h; // Most recent JST midnight
 
             { // Daily Reset
-                if (lastOnline < lastJstMidnight)
+                if (PChar->lastOnline < lastJstMidnight)
                 {
                     ClearDailyRecords(PChar);
                 }
             }
 
             { // Weekly Reset
-                // Get the current JST DOTW (0-6), that plus 6 mod 7 will push the start of the week to Monday.
-                // Multiply that to get seconds, and subtract from last JST midnight.
-                uint32 jstWeekday         = (CVanaTime::getInstance()->getJstWeekDay() + 6) % 7;
-                time_t lastJstWeeklyReset = lastJstMidnight - (jstWeekday * (60 * 60 * 24)); // Unix timestamp of last JST Midnight (Sunday->Monday)
-                time_t lastTwoJstResets   = lastJstWeeklyReset - (7 * (60 * 60 * 24));       // Unix timestamp of two JST resets ago
-
-                if (lastOnline < lastJstWeeklyReset)
+                auto lastWeeklyReset = earth_time::get_next_game_week(currentTime) - std::chrono::days(7);
+                if (PChar->lastOnline < lastWeeklyReset)
                 {
                     ClearWeeklyRecords(PChar);
 
-                    if (lastOnline < lastTwoJstResets)
+                    auto prevLastWeeklyReset = lastWeeklyReset - std::chrono::days(7);
+                    if (PChar->lastOnline < prevLastWeeklyReset)
                     {
                         charutils::SetPoints(PChar, "prev_accolades", 0);
                     }
                 }
             }
 
-            {                                                                                                                                  // 4hr Reset
-                time_t lastJstTimedBlock = lastJstMidnight + (static_cast<uint8>(CVanaTime::getInstance()->getJstHour() / 4) * (60 * 60 * 4)); // Unix timestamp of the start of the current 4-hr block
+            { // 4hr Reset
+                uint8 currentBlock      = static_cast<uint8>(earth_time::jst::get_hour(currentTime) / 4);
+                auto  lastJstTimedBlock = lastJstMidnight + std::chrono::hours(currentBlock * 4); // Start of the current 4-hr block
 
-                if (lastOnline < lastJstTimedBlock || PChar->m_eminenceLog.active[30] != GetActiveTimedRecord())
+                if (PChar->lastOnline < lastJstTimedBlock || PChar->m_eminenceLog.active[30] != GetActiveTimedRecord())
                 {
                     PChar->m_eminenceCache.notifyTimedRecord = static_cast<bool>(GetActiveTimedRecord());
                     AddActiveTimedRecord(PChar);
@@ -515,8 +498,9 @@ namespace roeutils
     uint16 GetActiveTimedRecord()
     {
         TracyZoneScoped;
-        uint8 day   = static_cast<uint8>(CVanaTime::getInstance()->getJstWeekDay());
-        uint8 block = static_cast<uint8>(CVanaTime::getInstance()->getJstHour() / 4);
+        auto  currentTime = earth_time::now();
+        uint8 day         = static_cast<uint8>(earth_time::jst::get_weekday(currentTime));
+        uint8 block       = static_cast<uint8>(earth_time::jst::get_hour(currentTime) / 4);
         return RoeSystem.TimedRecordTable[day][block];
     }
 
@@ -531,11 +515,11 @@ namespace roeutils
         auto timedRecordID              = GetActiveTimedRecord();
         PChar->m_eminenceLog.active[30] = timedRecordID;
         PChar->m_eminenceCache.activemap.set(timedRecordID);
-        PChar->pushPacket(new CRoeUpdatePacket(PChar));
+        PChar->pushPacket<CRoeUpdatePacket>(PChar);
 
         if (timedRecordID)
         {
-            PChar->pushPacket(new CMessageBasicPacket(PChar, PChar, timedRecordID, 0, MSGBASIC_ROE_TIMED));
+            PChar->pushPacket<CMessageBasicPacket>(PChar, PChar, timedRecordID, 0, MSGBASIC_ROE_TIMED);
             SetEminenceRecordCompletion(PChar, timedRecordID, false);
         }
     }
@@ -551,7 +535,7 @@ namespace roeutils
                 PChar->m_eminenceLog.progress[i] = 0;
             }
         }
-        PChar->pushPacket(new CRoeUpdatePacket(PChar));
+        PChar->pushPacket<CRoeUpdatePacket>(PChar);
 
         // Set completion for daily records to 0
         for (auto record : RoeSystem.DailyRecordIDs)
@@ -573,7 +557,7 @@ namespace roeutils
 
         for (int i = 0; i < 4; i++)
         {
-            PChar->pushPacket(new CRoeQuestLogPacket(PChar, i));
+            PChar->pushPacket<CRoeQuestLogPacket>(PChar, i);
         }
     }
 
@@ -629,7 +613,7 @@ namespace roeutils
                 PChar->m_eminenceLog.progress[i] = 0;
             }
         }
-        PChar->pushPacket(new CRoeUpdatePacket(PChar));
+        PChar->pushPacket<CRoeUpdatePacket>(PChar);
 
         // Set completion for daily records to 0
         for (auto record : RoeSystem.WeeklyRecordIDs)
@@ -652,7 +636,7 @@ namespace roeutils
 
         for (int i = 0; i < 4; i++)
         {
-            PChar->pushPacket(new CRoeQuestLogPacket(PChar, i));
+            PChar->pushPacket<CRoeQuestLogPacket>(PChar, i);
         }
     }
 
@@ -685,10 +669,8 @@ namespace roeutils
             return;
         }
 
-        const char* rankingQuery = "UPDATE unity_system SET members_prev = members_current, points_prev = points_current, members_current = 0, points_current = 0;";
-        sql->Query(rankingQuery);
-
-        roeutils::UpdateUnityRankings();
+        const char* rankingQuery = "UPDATE unity_system SET members_prev = members_current, points_prev = points_current, members_current = 0, points_current = 0";
+        _sql->Query(rankingQuery);
     }
 
     void UpdateUnityRankings()
@@ -700,21 +682,21 @@ namespace roeutils
             return;
         }
 
-        const char* memberQuery = "UPDATE unity_system JOIN (SELECT unity_leader, COUNT(*) AS members FROM char_profile GROUP BY unity_leader) TMP ON unity_system.leader = unity_leader SET unity_system.members_current = members;";
-        sql->Query(memberQuery);
+        const char* memberQuery = "UPDATE unity_system JOIN (SELECT unity_leader, COUNT(*) AS members FROM char_profile GROUP BY unity_leader) TMP ON unity_system.leader = unity_leader SET unity_system.members_current = members";
+        _sql->Query(memberQuery);
 
-        const char* unityQuery = "SELECT leader, CASE WHEN members_prev = 0 THEN 0 ELSE FLOOR(points_prev/members_prev) END AS eval FROM unity_system ORDER BY eval DESC;";
-        int32       ret        = sql->Query(unityQuery);
+        const char* unityQuery = "SELECT leader, CASE WHEN members_prev = 0 THEN 0 ELSE FLOOR(points_prev/members_prev) END AS eval FROM unity_system ORDER BY eval DESC";
+        int32       ret        = _sql->Query(unityQuery);
 
-        if (ret != SQL_ERROR && sql->NumRows() != 0)
+        if (ret != SQL_ERROR && _sql->NumRows() != 0)
         {
             uint8 currentRank = 1;
             uint8 rankGap     = 0;
             int32 prev_eval   = 0;
 
-            while (sql->NextRow() == SQL_SUCCESS)
+            while (_sql->NextRow() == SQL_SUCCESS)
             {
-                int32 new_eval = sql->GetIntData(1);
+                int32 new_eval = _sql->GetIntData(1);
 
                 if (new_eval < prev_eval)
                 {
@@ -728,7 +710,7 @@ namespace roeutils
 
                 prev_eval = new_eval;
 
-                roeutils::RoeSystem.unityLeaderRank[sql->GetIntData(0) - 1] = currentRank;
+                roeutils::RoeSystem.unityLeaderRank[_sql->GetIntData(0) - 1] = currentRank;
             }
         }
     }

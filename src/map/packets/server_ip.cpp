@@ -19,18 +19,28 @@
 ===========================================================================
 */
 
-#include "common/socket.h"
-
-#include "entities/charentity.h"
 #include "server_ip.h"
+#include "entities/charentity.h"
 #include "utils/zoneutils.h"
 
-CServerIPPacket::CServerIPPacket(CCharEntity* PChar, uint8 type, uint64 ipp)
+CServerIPPacket::CServerIPPacket(CCharEntity* PChar, uint8 zone_type, IPP zone_ipp)
 {
     this->setType(0x0B);
     this->setSize(0x1C);
 
-    ref<uint8>(0x04)  = type;
-    ref<uint32>(0x08) = (uint32)ipp;
-    ref<uint16>(0x0C) = (uint16)(ipp >> 32);
+    ref<uint8>(0x04)  = zone_type;
+    ref<uint32>(0x08) = zone_ipp.getIP();
+    ref<uint16>(0x0C) = zone_ipp.getPort();
+}
+
+auto CServerIPPacket::zoneType() const -> uint8
+{
+    return ref<uint8>(0x04);
+}
+
+auto CServerIPPacket::zoneIPP() const -> IPP
+{
+    const auto ip   = ref<uint32>(0x08);
+    const auto port = ref<uint16>(0x0C);
+    return IPP(ip, port);
 }

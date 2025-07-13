@@ -2,12 +2,19 @@
 -- Area: Upper Delkfutt's Tower
 --   NM: Autarch
 -----------------------------------
+---@type TMobEntity
 local entity = {}
 
 entity.onMobInitialize = function(mob)
     mob:setMobMod(xi.mobMod.AUTO_SPIKES, 1)
     mob:addStatusEffect(xi.effect.SHOCK_SPIKES, 40, 0, 0)
     mob:getStatusEffect(xi.effect.SHOCK_SPIKES):setEffectFlags(xi.effectFlag.DEATH)
+end
+
+entity.onMobSpawn = function(mob)
+    mob:addMod(xi.mod.ATT, 50)
+    mob:setMod(xi.mod.DOUBLE_ATTACK, 25)
+    mob:setMod(xi.mod.TRIPLE_ATTACK, 25)
 end
 
 entity.onSpikesDamage = function(mob, target, damage)
@@ -19,7 +26,7 @@ entity.onSpikesDamage = function(mob, target, damage)
     params.includemab = false
     dmg = addBonusesAbility(mob, xi.element.THUNDER, target, dmg, params)
     dmg = dmg * applyResistanceAddEffect(mob, target, xi.element.THUNDER, 0)
-    dmg = adjustForTarget(target, dmg, xi.element.THUNDER)
+    dmg = dmg * xi.spells.damage.calculateNukeAbsorbOrNullify(target, xi.element.THUNDER)
     dmg = finalMagicNonSpellAdjustments(mob, target, xi.element.THUNDER, dmg)
 
     if dmg < 0 then

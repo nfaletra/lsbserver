@@ -1,20 +1,20 @@
 ﻿/*
 ===========================================================================
 
-Copyright (c) 2010-2015 Darkstar Dev Teams
+  Copyright (c) 2010-2015 Darkstar Dev Teams
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see http://www.gnu.org/licenses/
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see http://www.gnu.org/licenses/
 
 ===========================================================================
 */
@@ -30,11 +30,10 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #include "entities/charentity.h"
 #include "entities/mobentity.h"
 #include "entities/trustentity.h"
+#include "mob_modifier.h"
 #include "packets/action.h"
 #include "status_effect_container.h"
 #include "utils/zoneutils.h"
-
-#include <cmath>
 
 CTargetFind::CTargetFind(CBattleEntity* PBattleEntity)
 : isPlayer(false)
@@ -46,6 +45,7 @@ CTargetFind::CTargetFind(CBattleEntity* PBattleEntity)
 , m_zone(0)
 , m_findType{}
 , m_findFlags(0)
+, m_targetFlags(0)
 , m_conal(false)
 , m_scalar(0.0f)
 , m_APoint(nullptr)
@@ -70,9 +70,9 @@ void CTargetFind::reset()
     m_PMasterTarget = nullptr;
 }
 
-void CTargetFind::findSingleTarget(CBattleEntity* PTarget, uint8 flags)
+void CTargetFind::findSingleTarget(CBattleEntity* PTarget, uint8 findFlags, uint16 targetFlags)
 {
-    m_findFlags     = flags;
+    m_findFlags     = findFlags;
     m_zone          = m_PBattleEntity->getZone();
     m_PTarget       = nullptr;
     m_PRadiusAround = &PTarget->loc.p;
@@ -80,12 +80,13 @@ void CTargetFind::findSingleTarget(CBattleEntity* PTarget, uint8 flags)
     addEntity(PTarget, false);
 }
 
-void CTargetFind::findWithinArea(CBattleEntity* PTarget, AOE_RADIUS radiusType, float radius, uint8 flags)
+void CTargetFind::findWithinArea(CBattleEntity* PTarget, AOE_RADIUS radiusType, float radius, uint8 findFlags, uint16 targetFlags)
 {
     TracyZoneScoped;
-    m_findFlags = flags;
-    m_radius    = radius;
-    m_zone      = m_PBattleEntity->getZone();
+    m_findFlags   = findFlags;
+    m_targetFlags = targetFlags;
+    m_radius      = radius;
+    m_zone        = m_PBattleEntity->getZone();
 
     if (radiusType == AOE_RADIUS::ATTACKER)
     {
@@ -147,7 +148,17 @@ void CTargetFind::findWithinArea(CBattleEntity* PTarget, AOE_RADIUS radiusType, 
     else
     {
         // handle this as a mob
-        if (m_PMasterTarget->objtype == TYPE_PC || m_PBattleEntity->allegiance == ALLEGIANCE_TYPE::PLAYER)
+        if (m_targetFlags & TARGET_ANY_ALLEGIANCE)
+        {
+            m_findType = FIND_TYPE::MONSTER_PLAYER;
+            if ((m_targetFlags & TARGET_SELF) && m_PBattleEntity->GetBattleTarget())
+            {
+                // This ability targets self for aoe skills (such as Frozen Mist)
+                // We must update the base target for allegiance checks
+                m_PMasterTarget = findMaster(m_PBattleEntity->GetBattleTarget());
+            }
+        }
+        else if (m_PMasterTarget->objtype == TYPE_PC || m_PBattleEntity->allegiance == ALLEGIANCE_TYPE::PLAYER)
         {
             m_findType = FIND_TYPE::MONSTER_PLAYER;
         }
@@ -186,10 +197,11 @@ void CTargetFind::findWithinArea(CBattleEntity* PTarget, AOE_RADIUS radiusType, 
     }
 }
 
-void CTargetFind::findWithinCone(CBattleEntity* PTarget, float distance, float angle, uint8 flags)
+void CTargetFind::findWithinCone(CBattleEntity* PTarget, float distance, float angle, uint8 findFlags, uint16 targetFlags, uint8 aoeType)
 {
-    m_findFlags = flags;
-    m_conal     = true;
+    m_findFlags   = findFlags;
+    m_targetFlags = targetFlags;
+    m_conal       = true;
 
     m_APoint = &m_PBattleEntity->loc.p;
 
@@ -197,7 +209,7 @@ void CTargetFind::findWithinCone(CBattleEntity* PTarget, float distance, float a
 
     // Confirmation on the center of cones is still needed for mob skills; player skills seem to be facing angle
     // uint8 angleToTarget = worldAngle(m_PBattleEntity->loc.p, PTarget->loc.p);
-    uint8 angleToTarget = m_APoint->rotation;
+    uint8 angleToTarget = relativeAngle(m_APoint->rotation, 128 * (aoeType == 8)); // adds 180 degree rotation if rear type
 
     // "Left" and "Right" are like the entity's face - "left" means "turning to the left" NOT "left when looking overhead"
     // Remember that rotation increases when turning to the right, and decreases when turning to the left
@@ -224,7 +236,7 @@ void CTargetFind::findWithinCone(CBattleEntity* PTarget, float distance, float a
     // calculate scalar
     m_scalar = (m_BPoint.x * m_CPoint.z) - (m_BPoint.z * m_CPoint.x);
 
-    findWithinArea(PTarget, AOE_RADIUS::ATTACKER, distance);
+    findWithinArea(PTarget, AOE_RADIUS::ATTACKER, distance, findFlags, targetFlags);
 }
 
 void CTargetFind::addAllInMobList(CBattleEntity* PTarget, bool withPet)
@@ -232,9 +244,8 @@ void CTargetFind::addAllInMobList(CBattleEntity* PTarget, bool withPet)
     CCharEntity* PChar = dynamic_cast<CCharEntity*>(findMaster(m_PBattleEntity));
     if (PChar)
     {
-        for (SpawnIDList_t::const_iterator it = PChar->SpawnMOBList.begin(); it != PChar->SpawnMOBList.end(); ++it)
+        FOR_EACH_PAIR_CAST_SECOND(CMobEntity*, PBattleTarget, PChar->SpawnMOBList)
         {
-            CBattleEntity* PBattleTarget = dynamic_cast<CBattleEntity*>(it->second);
             if (PBattleTarget && isMobOwner(PBattleTarget))
             {
                 addEntity(PBattleTarget, withPet);
@@ -288,7 +299,10 @@ void CTargetFind::addAllInParty(CBattleEntity* PTarget, bool withPet)
     {
         static_cast<CCharEntity*>(PTarget)->ForPartyWithTrusts([this, withPet](CBattleEntity* PMember)
         {
-            addEntity(PMember, withPet);
+            if (!PMember->isInMogHouse())
+            {
+                addEntity(PMember, withPet);
+            }
         });
     }
     else
@@ -305,12 +319,10 @@ void CTargetFind::addAllInEnmityList()
 {
     if (m_PBattleEntity->objtype == TYPE_MOB)
     {
-        CMobEntity*   mob        = (CMobEntity*)m_PBattleEntity;
-        EnmityList_t* enmityList = mob->PEnmityContainer->GetEnmityList();
+        CMobEntity* PMob = static_cast<CMobEntity*>(m_PBattleEntity);
 
-        for (auto& it : *enmityList)
+        for (const auto& [_, PEnmityObject] : *PMob->PEnmityContainer->GetEnmityList())
         {
-            EnmityObject_t& PEnmityObject = it.second;
             if (PEnmityObject.PEnmityOwner)
             {
                 addEntity(PEnmityObject.PEnmityOwner, false);
@@ -329,11 +341,10 @@ void CTargetFind::addAllInRange(CBattleEntity* PTarget, float radius, ALLEGIANCE
         if (PTarget->objtype == TYPE_PC)
         {
             CCharEntity* PChar = static_cast<CCharEntity*>(PTarget);
-            for (const auto& list : { PChar->SpawnPCList, PChar->SpawnPETList })
+            for (auto& spawnList : { PChar->SpawnPCList, PChar->SpawnPETList })
             {
-                for (const auto& pair : list)
+                FOR_EACH_PAIR_CAST_SECOND(CBattleEntity*, PBattleEntity, spawnList)
                 {
-                    CBattleEntity* PBattleEntity = static_cast<CBattleEntity*>(pair.second);
                     if (PBattleEntity && isWithinArea(&(PBattleEntity->loc.p)) && !PBattleEntity->isDead() &&
                         PBattleEntity->allegiance == ALLEGIANCE_TYPE::PLAYER)
                     {
@@ -393,6 +404,14 @@ bool CTargetFind::isMobOwner(CBattleEntity* PTarget)
         return true;
     }
 
+    if (auto* PMob = dynamic_cast<CMobEntity*>(PTarget))
+    {
+        if (PMob->getMobMod(MOBMOD_CLAIM_TYPE) == static_cast<int16>(ClaimType::NonExclusive))
+        {
+            return true;
+        }
+    }
+
     bool found = false;
 
     // clang-format off
@@ -450,31 +469,59 @@ bool CTargetFind::validEntity(CBattleEntity* PTarget)
         return true;
     }
 
-    if (m_PTarget->allegiance != PTarget->allegiance)
+    // short-circuit allegiance checks for aoe skills/abilities/spells that can hit players and mobs simultaneously
+    if (m_targetFlags & TARGET_ANY_ALLEGIANCE)
     {
-        return false;
+        if (m_targetFlags & TARGET_SELF)
+        {
+            if (m_PBattleEntity->allegiance == PTarget->allegiance)
+            {
+                // TARGET_ANY_ALLEGIANCE with TARGET_SELF means it should behave like TARGET_ENEMY
+                return false;
+            }
+        }
+        else if (m_PBattleEntity == PTarget)
+        {
+            // Don't erroneously include self when using TARGET_ANY_ALLEGIANCE
+            return false;
+        }
     }
-
-    // shouldn't add if target is charmed by the enemy
-    if (PTarget->PMaster != nullptr)
+    else
     {
-        if (m_findType == FIND_TYPE::MONSTER_PLAYER)
+        if (m_PTarget->allegiance != PTarget->allegiance)
         {
-            if (PTarget->PMaster->objtype == TYPE_MOB)
-            {
-                return false;
-            }
+            return false;
         }
-        else if (m_findType == FIND_TYPE::PLAYER_MONSTER)
+
+        // If offensive, don't target other entities with same allegiance
+        // Cures can be AoE with Accession and Majesty, ideally we would use SPELLGROUP or some other mechanism, but TargetFind wasn't designed with that in mind
+        if ((m_targetFlags & TARGET_ENEMY) && !(m_targetFlags & TARGET_PLAYER_PARTY) &&
+            m_PBattleEntity->allegiance == PTarget->allegiance)
         {
-            if (PTarget->PMaster->objtype == TYPE_PC)
-            {
-                return false;
-            }
+            return false;
         }
-        else if (m_findType == FIND_TYPE::MONSTER_MONSTER || m_findType == FIND_TYPE::PLAYER_PLAYER)
+
+        // shouldn't add if target is charmed by the enemy
+        if (PTarget->PMaster != nullptr)
         {
-            return PTarget->objtype == TYPE_TRUST;
+            if (m_findType == FIND_TYPE::MONSTER_PLAYER)
+            {
+                if (PTarget->PMaster->objtype == TYPE_MOB)
+                {
+                    return false;
+                }
+            }
+            else if (m_findType == FIND_TYPE::PLAYER_MONSTER)
+            {
+                if (PTarget->PMaster->objtype == TYPE_PC)
+                {
+                    return false;
+                }
+            }
+            else if (m_findType == FIND_TYPE::MONSTER_MONSTER || m_findType == FIND_TYPE::PLAYER_PLAYER)
+            {
+                return PTarget->objtype == TYPE_TRUST;
+            }
         }
     }
 

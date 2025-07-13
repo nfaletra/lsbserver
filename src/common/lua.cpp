@@ -59,19 +59,32 @@ void lua_init()
     // Bind fmt(...) globally
     lua.set_function("fmt", &lua_fmt);
 
+    // Bind sleep(...) globally
+    //
+    // THIS IS A FULLY MAIN THREAD BLOCKING SLEEP
+    // DO NOT USE THIS IN REGULAR CODE
+    // THIS IS ONLY FOR TESTING
+    // clang-format off
+    lua.set_function("sleep", [](float sec)
+    {
+        std::cout << "Blocking main thread for " << sec << " seconds!\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(sec * 1000)));
+    });
+    // clang-format on
+
     // Attempt to startup lldebugger
     auto result = lua["require"]("lldebugger");
     if (result.valid())
     {
         result.get<sol::table>()["start"];
-        ShowInfo("Started script debugger");
+        std::cout << "Started script debugger\n";
     }
 }
 
 /**
  * @brief
  */
-std::string lua_to_string_depth(sol::object const& obj, std::size_t depth)
+std::string lua_to_string_depth(const sol::object& obj, std::size_t depth)
 {
     switch (obj.get_type())
     {
@@ -203,7 +216,7 @@ void lua_print(sol::variadic_args va)
     ShowLua(lua_to_string(va).c_str());
 }
 
-std::string lua_fmt(std::string fmtStr, sol::variadic_args va)
+std::string lua_fmt(const std::string& fmtStr, sol::variadic_args va)
 {
     fmt::dynamic_format_arg_store<fmt::format_context> store;
     for (auto const& arg : va)

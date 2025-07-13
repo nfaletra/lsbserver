@@ -7,33 +7,34 @@ zones[xi.zone.LEBROS_CAVERN] =
 {
     text =
     {
-        ITEM_CANNOT_BE_OBTAINED       = 6384, -- You cannot obtain the <item>. Come back after sorting your inventory.
-        FULL_INVENTORY_AFTER_TRADE    = 6388, -- You cannot obtain the <item>. Try trading again after sorting your inventory.
-        ITEM_OBTAINED                 = 6390, -- Obtained: <item>.
-        GIL_OBTAINED                  = 6391, -- Obtained <number> gil.
-        KEYITEM_OBTAINED              = 6393, -- Obtained key item: <keyitem>.
-        KEYITEM_LOST                  = 6394, -- Lost key item: <keyitem>.
-        NOT_HAVE_ENOUGH_GIL           = 6395, -- You do not have enough gil.
-        ITEMS_OBTAINED                = 6399, -- You obtain <number> <item>!
-        MINE_COUNTDOWN                = 6982, -- <number>...
-        CARRIED_OVER_POINTS           = 7001, -- You have carried over <number> login point[/s].
-        LOGIN_CAMPAIGN_UNDERWAY       = 7002, -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!
-        LOGIN_NUMBER                  = 7003, -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
-        MEMBERS_LEVELS_ARE_RESTRICTED = 7023, -- Your party is unable to participate because certain members' levels are restricted.
-        TEMP_ITEM                     = 7219, -- Obtained temporary item: <item>!
-        PLAYER_OBTAINS_ITEM           = 7220, -- <name> obtains <item>!
-        ASSAULT_START_OFFSET          = 7355, -- Max MP Down removed for <name>.
-        TIME_TO_COMPLETE              = 7416, -- You have <number> [minute/minutes] (Earth time) to complete this mission.
-        MISSION_FAILED                = 7417, -- The mission has failed. Leaving area.
-        RUNE_UNLOCKED_POS             = 7418, -- ission objective completed. Unlocking Rune of Release ([A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W/X/Y/Z]-#).
-        ASSAULT_POINTS_OBTAINED       = 7420, -- You gain <number> [Assault point/Assault points]!
-        TIME_REMAINING_MINUTES        = 7421, -- ime remaining: <number> [minute/minutes] (Earth time).
-        TIME_REMAINING_SECONDS        = 7422, -- ime remaining: <number> [second/seconds] (Earth time).
-        PARTY_FALLEN                  = 7424, -- ll party members have fallen in battle. Mission failure in <number> [minute/minutes].
+        ITEM_CANNOT_BE_OBTAINED       = 6385, -- You cannot obtain the <item>. Come back after sorting your inventory.
+        FULL_INVENTORY_AFTER_TRADE    = 6389, -- You cannot obtain the <item>. Try trading again after sorting your inventory.
+        ITEM_OBTAINED                 = 6391, -- Obtained: <item>.
+        GIL_OBTAINED                  = 6392, -- Obtained <number> gil.
+        KEYITEM_OBTAINED              = 6394, -- Obtained key item: <keyitem>.
+        KEYITEM_LOST                  = 6395, -- Lost key item: <keyitem>.
+        NOT_HAVE_ENOUGH_GIL           = 6396, -- You do not have enough gil.
+        ITEMS_OBTAINED                = 6400, -- You obtain <number> <item>!
+        MINE_COUNTDOWN                = 6983, -- <number>...
+        CARRIED_OVER_POINTS           = 7002, -- You have carried over <number> login point[/s].
+        LOGIN_CAMPAIGN_UNDERWAY       = 7003, -- The [/January/February/March/April/May/June/July/August/September/October/November/December] <number> Login Campaign is currently underway!
+        LOGIN_NUMBER                  = 7004, -- In celebration of your most recent login (login no. <number>), we have provided you with <number> points! You currently have a total of <number> points.
+        MEMBERS_LEVELS_ARE_RESTRICTED = 7024, -- Your party is unable to participate because certain members' levels are restricted.
+        TEMP_ITEM                     = 7225, -- Obtained temporary item: <item>!
+        PLAYER_OBTAINS_ITEM           = 7226, -- <name> obtains <item>!
+        ASSAULT_START_OFFSET          = 7361, -- Max MP Down removed for <name>.
+        TIME_TO_COMPLETE              = 7422, -- You have <number> [minute/minutes] (Earth time) to complete this mission.
+        MISSION_FAILED                = 7423, -- The mission has failed. Leaving area.
+        RUNE_UNLOCKED_POS             = 7424, -- ission objective completed. Unlocking Rune of Release ([A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W/X/Y/Z]-#).
+        ASSAULT_POINTS_OBTAINED       = 7426, -- You gain <number> [Assault point/Assault points]!
+        TIME_REMAINING_MINUTES        = 7427, -- ime remaining: <number> [minute/minutes] (Earth time).
+        TIME_REMAINING_SECONDS        = 7428, -- ime remaining: <number> [second/seconds] (Earth time).
+        PARTY_FALLEN                  = 7430, -- ll party members have fallen in battle. Mission failure in <number> [minute/minutes].
     },
 
     mob =
     {
+        WAMOURA_OFFSET = GetTableOfIDs('Ranch_Wamoura'),
         [xi.assault.mission.EXCAVATION_DUTY] =
         {
             MOBS_START =
@@ -71,13 +72,13 @@ zones[xi.zone.LEBROS_CAVERN] =
 
     npc =
     {
-        ANCIENT_LOCKBOX = 17035478,
-        RUNE_OF_RELEASE = 17035479,
-        _1rx            = 17035537,
-        _1ry            = 17035538,
-        _1rz            = 17035539,
-        _jr0            = 17035540,
-        _jr1            = 17035541,
+        ANCIENT_LOCKBOX = GetFirstID('Ancient_Lockbox'),
+        RUNE_OF_RELEASE = GetFirstID('Rune_of_Release'),
+        _1rx            = GetFirstID('_1rx'),
+        _1ry            = GetFirstID('_1ry'),
+        _1rz            = GetFirstID('_1rz'),
+        _jr0            = GetFirstID('_jr0'),
+        _jr1            = GetFirstID('_jr1'),
     }
 }
 

@@ -19,8 +19,8 @@
 #include <cstring>
 
 #include "entities/charentity.h"
-#include "map.h"
-#include "message.h"
+#include "ipc_client.h"
+#include "map_server.h"
 #include "unitychat.h"
 #include "utils/jailutils.h"
 
@@ -36,7 +36,7 @@ uint32 CUnityChat::getLeader() const
 
 void CUnityChat::AddMember(CCharEntity* PChar)
 {
-    sql->Query("UPDATE accounts_sessions SET unitychat = %u WHERE charid = %u", this->getLeader(), PChar->id);
+    db::preparedStmt("UPDATE accounts_sessions SET unitychat = ? WHERE charid = ? LIMIT 1", this->getLeader(), PChar->id);
     PChar->PUnityChat = this;
     members.emplace_back(PChar);
 }
@@ -47,7 +47,7 @@ bool CUnityChat::DelMember(CCharEntity* PChar)
     {
         if (members.at(i) == PChar)
         {
-            sql->Query("UPDATE accounts_sessions SET unitychat = 0 WHERE charid = %u", PChar->id);
+            db::preparedStmt("UPDATE accounts_sessions SET unitychat = 0 WHERE charid = ? LIMIT 1", PChar->id);
             PChar->PUnityChat = nullptr;
             members.erase(members.begin() + i);
             break;
@@ -56,17 +56,15 @@ bool CUnityChat::DelMember(CCharEntity* PChar)
     return !members.empty();
 }
 
-void CUnityChat::PushPacket(uint32 senderID, CBasicPacket* packet)
+void CUnityChat::PushPacket(uint32 senderID, const std::unique_ptr<CBasicPacket>& packet)
 {
     for (auto& member : members)
     {
         if (member->id != senderID && member->status != STATUS_TYPE::DISAPPEAR && !jailutils::InPrison(member))
         {
-            CBasicPacket* newPacket = new CBasicPacket(*packet);
-            member->pushPacket(newPacket);
+            member->pushPacket(packet->copy());
         }
     }
-    destroy(packet);
 }
 
 namespace unitychat

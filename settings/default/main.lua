@@ -70,6 +70,9 @@ xi.settings.main =
     -- VoidWalker
     ENABLE_VOIDWALKER = 1,
 
+    -- Moblin Maze Mongers
+    ENABLE_MMM = 0,
+
     -- Monstrosity (Heavily in development, use at your own risk!)
     ENABLE_MONSTROSITY               = 0,
     MONSTROSITY_INFAMY_RATIO         = 0.1, -- (float) The ratio of exp gained to infamy gained on defeating a mob.
@@ -136,6 +139,8 @@ xi.settings.main =
     USE_ADOULIN_WEAPON_SKILL_CHANGES = true,  -- true/false. Change to toggle new Adoulin weapon skill damage calculations
     DISABLE_PARTY_EXP_PENALTY        = false, -- true/false.
     ENABLE_IMMUNOBREAK               = true,  -- true/false. Allow/Disallow immunobreaks to happen.
+    USE_PRE_2013_DEX_MULTIPLIER      = false, -- true/false. False uses 75% of DEX for accuracy calculation. Prior to 2013 50% of DEX was used.
+    USE_PRE_2013_STR_MULTIPLIER      = false, -- true/false. False uses STR multiplier of 1.0 for two handed, one handed main, and ranged attacks, 0.75 for H2H, and 0.5 for one handed in sub slot. True uses 0.5 of STR across the board and is how the game was from release to mid 2013.
 
     -- TRUSTS
     ENABLE_TRUST_CASTING           = 1,
@@ -222,8 +227,6 @@ xi.settings.main =
     SPIKE_EFFECT_DURATION           = 180,   -- the duration of RDM, BLM spikes effects (not Reprisal)
     ELEMENTAL_DEBUFF_DURATION       = 120,   -- base duration of elemental debuffs
     AQUAVEIL_COUNTER                = 1,     -- Base amount of hits Aquaveil absorbs to prevent spell interrupts. Retail is 1.
-    ABSORB_SPELL_AMOUNT             = 8,     -- how much of a stat gets absorbed by DRK absorb spells - expected to be a multiple of 8.
-    ABSORB_SPELL_TICK               = 9,     -- duration of 1 absorb spell tick
     SNEAK_INVIS_DURATION_MULTIPLIER = 1,     -- multiplies duration of sneak, invis, deodorize to reduce player torture. 1 = retail behavior.
     USE_OLD_CURE_FORMULA            = false, -- true/false. if true, uses older cure formula (3*MND + VIT + 3*(healing skill/5)) // cure 6 will use the newer formula
     USE_OLD_MAGIC_DAMAGE            = false, -- true/false. if true, uses older magic damage formulas
@@ -266,6 +269,11 @@ xi.settings.main =
     -- Please visit scripts/globals/events/login_campaign.lua for assigning the correct campaign dates.
     ENABLE_LOGIN_CAMPAIGN = 0,
 
+    -- FISH RANKING CONTEST
+    -- Set to false to require manual progression of contest
+    AUTO_FISHING_CONTEST = true,
+    MAX_FAKE_ENTRIES     = 15,
+
     -- NYZUL
     RUNIC_DISK_SAVE      = true, -- Allow anyone participating in Nyzul to save progress. Set to false so only initiator can save progress.
     ENABLE_NYZUL_CASKETS = true, -- Enable Treasure casket pops from NMs.
@@ -282,6 +290,9 @@ xi.settings.main =
     CHOCOBO_RAISING_DISABLE_RETIREMENT  = false, -- true/false.
     CHOCOBO_RAISING_STAT_GROWTH_CAP     = 512,   -- int.
 
+    -- SYNERGY (HEAVILY-IN-DEVELOPMENT, USE AT YOUR OWN RISK)
+    ENABLE_SYNERGY = false, -- true/false. Enable Synergy features.
+
     -- MISC
     RIVERNE_PORTERS              = 120,   -- Time in seconds that Unstable Displacements in Cape Riverne stay open after trading a scale.
     LANTERNS_STAY_LIT            = 1200,  -- time in seconds that lanterns in the Den of Rancor stay lit.
@@ -291,7 +302,7 @@ xi.settings.main =
     NUMBER_OF_DM_EARRINGS        = 1,     -- Number of earrings players can simultaneously own from Divine Might before scripts start blocking them (Default: 1)
     HOMEPOINT_TELEPORT           = 1,     -- Enables the homepoint teleport system
     DIG_ABUNDANCE_BONUS          = 0,     -- Increase chance of digging up an item (450  = item digup chance +45)
-    DIG_FATIGUE                  = 1,     -- Set to 0 to disable Dig Fatigue
+    DIG_FATIGUE                  = 100,   -- Allowed succesful digs per day. Set to 0 to disable Dig Fatigue
     DIG_GRANT_BURROW             = 0,     -- Set to 1 to grant burrow ability
     DIG_GRANT_BORE               = 0,     -- Set to 1 to grant bore ability
     ENM_COOLDOWN                 = 120,   -- Number of hours before a player can obtain same KI for ENMs (default: 5 days)

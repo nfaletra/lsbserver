@@ -25,7 +25,7 @@
 #include <optional>
 
 #include "common/cbasetypes.h"
-#include "common/taskmgr.h"
+#include "common/task_manager.h"
 
 #include "common/lua.h"
 extern sol::state lua;
@@ -34,16 +34,9 @@ extern sol::state lua;
 // SOL_ALL_SAFETIES_ON = 1
 // SOL_NO_CHECK_NUMBER_PRECISION = 1
 #include "sol/sol.hpp"
+#include "sol_bindings.h"
 
-// sol changes this behaviour to return 0 rather than truncating
-// we rely on that, so change it back
-#undef lua_tointeger
-#define lua_tointeger(L, n) static_cast<lua_Integer>(std::floor(lua_tonumber(L, n)))
-
-#define SOL_USERTYPE(TypeName, BindingTypeName) \
-    std::string className = TypeName;           \
-    lua.new_usertype<BindingTypeName>(className)
-#define SOL_REGISTER(FuncName, Func) lua[className][FuncName] = &Func
+#include "common/xi.h"
 
 #include "items/item_equipment.h"
 #include "spell.h"
@@ -63,6 +56,15 @@ extern sol::state lua;
 #include "lua_trigger_area.h"
 #include "lua_zone.h"
 
+enum class SendToDBoxReturnCode : uint8
+{
+    SUCCESS                       = 0,
+    SUCCESS_LIMITED_TO_STACK_SIZE = 1,
+    PLAYER_NOT_FOUND              = 2,
+    ITEM_NOT_FOUND                = 3,
+    QUERY_ERROR                   = 4
+};
+
 class CAbility;
 class CSpell;
 class CBaseEntity;
@@ -75,7 +77,7 @@ class CItem;
 class CInstance;
 class CMobSkill;
 class CPetSkill;
-class CTriggerArea;
+class ITriggerArea;
 class CStatusEffect;
 class CTradeContainer;
 class CItemPuppet;
@@ -110,16 +112,94 @@ enum class Emote : uint8;
 
 namespace luautils
 {
-    void SafeApplyFunc_ReloadList(std::function<void(std::map<std::string, uint64>&)> func);
+    namespace detail
+    {
+        // TODO:
+        // Instead of always taking a string of the form "xi.server.onTimeServerTick"
+        // and splitting it into parts, then using those parts to walk up the Lua
+        // global table, we can build a map of that string to the underlying sol::reference.
+        //
+        // This however comes with the cost of maintaining this map, and those sol::references
+        // keep the underlying objects alive, so we need to be careful about what we cache.
 
-    int32 init();
-    int32 garbageCollectStep();
-    int32 garbageCollectFull();
-    void  cleanup();
+        // auto findCachedObject(const std::string& objName) -> sol::reference;
+        // void cacheObject(const std::string& objName, sol::reference obj);
+        auto findGlobalLuaFunction(const std::string& funcName) -> sol::function;
+    } // namespace detail
 
-    void ReloadFilewatchList();
+    void init(IPP mapIPP, bool isRunningInCI);
+    void garbageCollectStep();
+    void garbageCollectFull();
+    void cleanup();
 
-    std::vector<std::string> GetContainerFilenamesList();
+    // Find and call a global function in Lua from C++.
+    //
+    // If the function is not found or an error occurs, an error message is printed to the console.
+    //
+    // Examples:
+    //
+    // ```cpp
+    // luautils::callGlobal<void>("xi.server.onTimeServerTick");
+    // luautils::callGlobal<void>("xi.player.onPlayerDeath", PChar);
+    // auto value = callGlobal<uint32>("xi.server.functionThatReturnsANumber");
+    // ```
+    //
+    // NOTE: This is slower (but safet) than looking up something manually like this:
+    //     : lua["xi"]["server"]["onTimeServerTick"]();
+    template <typename T, typename... Targs>
+    auto callGlobal(const std::string& funcName, Targs... args)
+    {
+        auto func = detail::findGlobalLuaFunction(funcName);
+        if (!func.valid())
+        {
+            ShowError("luautils::callGlobalFunction: %s: Function not found", funcName);
+            if constexpr (std::is_void_v<T>)
+            {
+                return;
+            }
+            else
+            {
+                return T{};
+            }
+        }
+
+        const auto result = func(std::forward<Targs>(args)...);
+        if (!result.valid())
+        {
+            sol::error err = result;
+            ShowError("luautils::callGlobalFunction: %s: %s", funcName, err.what());
+            if constexpr (std::is_void_v<T>)
+            {
+                return;
+            }
+            else
+            {
+                return T{};
+            }
+        }
+
+        if constexpr (std::is_void_v<T>)
+        {
+            return;
+        }
+        else
+        {
+            auto returnObject = result.template get<sol::object>();
+            if (returnObject.template is<T>())
+            {
+                return returnObject.template as<T>();
+            }
+            else
+            {
+                ShowError("luautils::callGlobalFunction: %s: Invalid return type", funcName);
+                return T{};
+            }
+        }
+    }
+
+    void TryReloadFilewatchList();
+
+    auto GetContainerFilenamesList() -> std::vector<std::string>;
 
     // Cache helpers
     auto getEntityCachedFunction(CBaseEntity* PEntity, std::string funcName) -> sol::function;
@@ -132,35 +212,48 @@ namespace luautils
 
     void SendEntityVisualPacket(uint32 npcid, const char* command);
     void InitInteractionGlobal();
-    auto GetZone(uint16 zoneId) -> std::optional<CLuaZone>;
-    auto GetItemByID(uint32 itemId) -> std::optional<CLuaItem>;
-    auto GetNPCByID(uint32 npcid, sol::object const& instanceObj) -> std::optional<CLuaBaseEntity>;
-    auto GetMobByID(uint32 mobid, sol::object const& instanceObj) -> std::optional<CLuaBaseEntity>;
-    auto GetEntityByID(uint32 mobid, sol::object const& instanceObj, sol::object const& arg3) -> std::optional<CLuaBaseEntity>;
+    auto GetZone(uint16 zoneId) -> CZone*;
+    auto GetItemByID(uint32 itemId) -> CItem*;
+    auto GetNPCByID(uint32 npcid, sol::object const& instanceObj) -> CBaseEntity*;
+    auto GetMobByID(uint32 mobid, sol::object const& instanceObj) -> CBaseEntity*;
+    auto GetEntityByID(uint32 mobid, sol::object const& instanceObj, sol::object const& arg3) -> CBaseEntity*;
 
-    void  WeekUpdateConquest(sol::variadic_args va);
+    void  WeekUpdateConquest(uint8 updateType);
     uint8 GetRegionOwner(uint8 type);
     uint8 GetRegionInfluence(uint8 type); // Return influence graphics
     uint8 GetNationRank(uint8 nation);
     uint8 GetConquestBalance();
     bool  IsConquestAlliance();
-    int32 SetRegionalConquestOverseers(uint8 regionID); // Update NPC Conquest Guard
-    void  SendLuaFuncStringToZone(uint16 zoneId, std::string const& str);
+    void  SetRegionalConquestOverseers(uint8 regionID); // Update NPC Conquest Guard
+    void  SendLuaFuncStringToZone(uint16 requestingZoneId, uint16 executorZoneId, std::string const& str);
 
-    auto GetReadOnlyItem(uint32 id) -> std::optional<CLuaItem>; // Returns a read only lookup item object of the specified ID
-    auto GetAbility(uint16 id) -> std::optional<CLuaAbility>;
-    auto GetSpell(uint16 id) -> std::optional<CLuaSpell>;
+    void UpdateSanrakusMobs(); // Update sanraku's (ZNM) subject of interest and recommended fauna
+    void ZNMPopPriceDecay();   // Price of ZNM pop items decay over time
 
-    auto SpawnMob(uint32 mobid, sol::object const& arg2, sol::object const& arg3) -> std::optional<CLuaBaseEntity>; // Spawn Mob By Mob Id - NMs, BCNM...
-    void DespawnMob(uint32 mobid, sol::object const& arg2);                                                         // Despawn (Fade Out) Mob By Id
-    auto GetPlayerByName(std::string const& name) -> std::optional<CLuaBaseEntity>;
-    auto GetPlayerByID(uint32 pid) -> std::optional<CLuaBaseEntity>;
+    auto GetReadOnlyItem(uint32 id) -> CItem*; // Returns a read only lookup item object of the specified ID
+    auto GetAbility(uint16 id) -> CAbility*;
+    auto GetSpell(uint16 id) -> CSpell*;
+
+    auto SpawnMob(uint32 mobid, sol::object const& arg2, sol::object const& arg3) -> CBaseEntity*; // Spawn Mob By Mob Id - NMs, BCNM...
+    void DespawnMob(uint32 mobid, sol::object const& arg2);                                        // Despawn (Fade Out) Mob By Id
+    auto GetPlayerByName(std::string const& name) -> CBaseEntity*;
+    auto GetPlayerByID(uint32 pid) -> CBaseEntity*;
+    bool PlayerHasValidSession(uint32 playerId);
+    void SendToJailOffline(uint32 playerId, int8 cellId, float posX, float posY, float posZ, uint8 rot);
+    void DrawIn(CLuaBaseEntity* PLuaBaseEntity, sol::table const& table, float offset, float degrees);
 
     uint32 GetSystemTime();
     uint32 JstMidnight();
-    uint32 JstWeekday();
+    uint32 JstDayOfTheYear();
+    uint32 JstDayOfTheMonth();
+    uint32 JstDayOfTheWeek();
+    int32  JstYear();
+    uint32 JstMonth();
+    uint32 JstHour();
+
     uint32 NextGameTime(uint32 intervalSeconds);
     uint32 NextJstWeek();
+
     uint32 VanadielTime();
     uint8  VanadielTOTD();
     uint32 VanadielHour();
@@ -176,7 +269,6 @@ namespace luautils
     uint8  VanadielMoonDirection();
     uint8  VanadielRSERace();
     uint8  VanadielRSELocation();
-    bool   SetVanadielTimeOffset(int32 offset);
     bool   IsMoonNew();
     bool   IsMoonFull();
     void   StartElevator(uint32 ElevatorID);
@@ -192,87 +284,91 @@ namespace luautils
     void  Terminate();                                                                                   // Logs off all characters and terminates the server
 
     int32 GetTextIDVariable(uint16 ZoneID, const char* variable); // Load the value of the TextID variable of the specified zone
-    bool  IsContentEnabled(const char* content);
+    bool  IsContentEnabled(const std::string& content);
 
-    int32 OnGameDay(CZone* PZone);
-    int32 OnGameHour(CZone* PZone);
-    int32 OnZoneWeatherChange(uint16 ZoneID, uint8 weather);
-    int32 OnTOTDChange(uint16 ZoneID, uint8 TOTD);
+    void OnGameDay(CZone* PZone);
+    void OnGameHour(CZone* PZone);
+    void OnZoneWeatherChange(uint16 ZoneID, uint8 weather);
+    void OnTOTDChange(uint16 ZoneID, uint8 TOTD);
 
-    int32 OnGameIn(CCharEntity* PChar, bool zoning);
-    void  OnZoneIn(CCharEntity* PChar);
-    void  OnZoneOut(CCharEntity* PChar);
-    void  AfterZoneIn(CBaseEntity* PChar);
-    int32 OnZoneInitialise(uint16 ZoneID);
-    void  OnZoneTick(CZone* PZone);
-    int32 OnTriggerAreaEnter(CCharEntity* PChar, CTriggerArea* PTriggerArea);
-    int32 OnTriggerAreaLeave(CCharEntity* PChar, CTriggerArea* PTriggerArea);
-    int32 OnTransportEvent(CCharEntity* PChar, uint32 TransportID);
-    void  OnTimeTrigger(CNpcEntity* PNpc, uint8 triggerID);
-    int32 OnConquestUpdate(CZone* PZone, ConquestUpdate type, uint8 influence, uint8 owner, uint8 ranking, bool isConquestAlliance); // conquest update (hourly or tally)
+    void OnGameIn(CCharEntity* PChar, bool zoning);
+    void OnZoneIn(CCharEntity* PChar);
+    void OnZoneOut(CCharEntity* PChar);
+    void AfterZoneIn(CBaseEntity* PChar);
+    void OnZoneInitialize(uint16 ZoneID);
+    void OnZoneTick(CZone* PZone);
+
+    void OnTriggerAreaEnter(CCharEntity* PChar, std::unique_ptr<ITriggerArea> const& PTriggerArea); // when player enters a trigger area in a zone
+    void OnTriggerAreaLeave(CCharEntity* PChar, std::unique_ptr<ITriggerArea> const& PTriggerArea); // when player leaves a trigger area in a zone
+
+    void OnTransportEvent(CCharEntity* PChar, uint32 TransportID);
+    void OnTimeTrigger(CNpcEntity* PNpc, uint8 triggerID);
+    void OnConquestUpdate(CZone* PZone, ConquestUpdate type, uint8 influence, uint8 owner, uint8 ranking, bool isConquestAlliance); // conquest update (hourly or tally)
 
     void OnServerStart();
     void OnJSTMidnight();
     void OnTimeServerTick();
 
     int32 OnTrigger(CCharEntity* PChar, CBaseEntity* PNpc);
-    int32 OnEventUpdate(CCharEntity* PChar, uint16 eventID, uint32 result, uint16 extras); // triggered when game triggers event update during cutscene with extra parameters (battlefield)
-    int32 OnEventUpdate(CCharEntity* PChar, uint16 eventID, uint32 result);                // triggered when game triggers event update during cutscene
-    int32 OnEventUpdate(CCharEntity* PChar, std::string const& updateString);              // triggered when game triggers event update during cutscene
+    int32 OnEventUpdate(CCharEntity* PChar, uint16 eventID, uint32 result);   // triggered when game triggers event update during cutscene
+    int32 OnEventUpdate(CCharEntity* PChar, std::string const& updateString); // triggered when game triggers event update during cutscene
     int32 OnEventFinish(CCharEntity* PChar, uint16 eventID, uint32 result);
-    int32 OnTrade(CCharEntity* PChar, CBaseEntity* PNpc);
+    void  OnTrade(CCharEntity* PChar, CBaseEntity* PNpc);
 
-    int32 OnNpcSpawn(CBaseEntity* PNpc); // triggers when a patrol npc spawns
+    void OnNpcSpawn(CBaseEntity* PNpc); // triggers when a patrol npc spawns
 
-    int32 OnEffectGain(CBattleEntity* PEntity, CStatusEffect* StatusEffect);
-    int32 OnEffectTick(CBattleEntity* PEntity, CStatusEffect* StatusEffect);
-    int32 OnEffectLose(CBattleEntity* PEntity, CStatusEffect* StatusEffect);
+    void OnEffectGain(CBattleEntity* PEntity, CStatusEffect* StatusEffect);
+    void OnEffectTick(CBattleEntity* PEntity, CStatusEffect* StatusEffect);
+    void OnEffectLose(CBattleEntity* PEntity, CStatusEffect* StatusEffect);
 
-    int32 OnAttachmentEquip(CBattleEntity* PEntity, CItemPuppet* attachment);
-    int32 OnAttachmentUnequip(CBattleEntity* PEntity, CItemPuppet* attachment);
-    int32 OnManeuverGain(CBattleEntity* PEntity, CItemPuppet* attachment, uint8 maneuvers);
-    int32 OnManeuverLose(CBattleEntity* PEntity, CItemPuppet* attachment, uint8 maneuvers);
-    int32 OnUpdateAttachment(CBattleEntity* PEntity, CItemPuppet* attachment, uint8 maneuvers);
+    void OnAttachmentEquip(CBattleEntity* PEntity, CItemPuppet* attachment);
+    void OnAttachmentUnequip(CBattleEntity* PEntity, CItemPuppet* attachment);
+    void OnManeuverGain(CBattleEntity* PEntity, CItemPuppet* attachment, uint8 maneuvers);
+    void OnManeuverLose(CBattleEntity* PEntity, CItemPuppet* attachment, uint8 maneuvers);
+    void OnUpdateAttachment(CBattleEntity* PEntity, CItemPuppet* attachment, uint8 maneuvers);
 
-    int32 OnItemUse(CBaseEntity* PUser, CBaseEntity* PTarget, CItem* PItem);
-    auto  OnItemCheck(CBaseEntity* PTarget, CItem* PItem, ITEMCHECK param = ITEMCHECK::NONE, CBaseEntity* PCaster = nullptr) -> std::tuple<int32, int32, int32>;
-    int32 OnItemDrop(CBaseEntity* PUser, CItem* PItem);
-    int32 OnItemEquip(CBaseEntity* PUser, CItem* PItem);
-    int32 OnItemUnequip(CBaseEntity* PUser, CItem* PItem);
-    int32 CheckForGearSet(CBaseEntity* PTarget);
+    void OnItemUse(CBaseEntity* PUser, CBaseEntity* PTarget, CItem* PItem);
+    auto OnItemCheck(CBaseEntity* PTarget, CItem* PItem, ITEMCHECK param = ITEMCHECK::NONE, CBaseEntity* PCaster = nullptr) -> std::tuple<int32, int32, int32>;
+    void OnItemDrop(CBaseEntity* PUser, CItem* PItem);
+    void OnItemEquip(CBaseEntity* PUser, CItem* PItem);
+    void OnItemUnequip(CBaseEntity* PUser, CItem* PItem);
+    void CheckForGearSet(CBaseEntity* PTarget);
 
     int32 OnMagicCastingCheck(CBaseEntity* PChar, CBaseEntity* PTarget, CSpell* PSpell);
     int32 OnSpellCast(CBattleEntity* PCaster, CBattleEntity* PTarget, CSpell* PSpell);
-    int32 OnSpellPrecast(CBattleEntity* PCaster, CSpell* PSpell);
+    void  OnSpellPrecast(CBattleEntity* PCaster, CSpell* PSpell);
     auto  OnMobMagicPrepare(CBattleEntity* PCaster, CBattleEntity* PTarget, std::optional<SpellID> startingSpellId) -> std::optional<SpellID>;
-    int32 OnMagicHit(CBattleEntity* PCaster, CBattleEntity* PTarget, CSpell* PSpell);
-    int32 OnWeaponskillHit(CBattleEntity* PMob, CBaseEntity* PAttacker, uint16 PWeaponskill);
+    void  OnMagicHit(CBattleEntity* PCaster, CBattleEntity* PTarget, CSpell* PSpell);
+    void  OnWeaponskillHit(CBattleEntity* PMob, CBaseEntity* PAttacker, uint16 PWeaponskill);
     bool  OnTrustSpellCastCheckBattlefieldTrusts(CBattleEntity* PCaster); // Triggered if spell is a trust spell during onCast to determine to interrupt spell or not
 
-    int32 OnMobInitialize(CBaseEntity* PMob);
-    int32 ApplyMixins(CBaseEntity* PMob);
-    int32 ApplyZoneMixins(CBaseEntity* PMob);
-    int32 OnMobSpawn(CBaseEntity* PMob);
-    int32 OnMobRoamAction(CBaseEntity* PMob); // triggers when event mob is ready for a custom roam action
-    int32 OnMobRoam(CBaseEntity* PMob);
-    int32 OnMobEngage(CBaseEntity* PMob, CBaseEntity* PTarget);
-    int32 OnMobDisengage(CBaseEntity* PMob);
-    int32 OnMobDrawIn(CBaseEntity* PMob, CBaseEntity* PTarget);
-    int32 OnMobFight(CBaseEntity* PMob, CBaseEntity* PTarget);
-    int32 OnCriticalHit(CBattleEntity* PMob, CBattleEntity* PAttacker);
-    int32 OnMobDeath(CBaseEntity* PMob, CBaseEntity* PKiller);
-    int32 OnMobDespawn(CBaseEntity* PMob);
+    void OnMobInitialize(CBaseEntity* PMob);
+    void ApplyMixins(CBaseEntity* PMob);
+    void ApplyZoneMixins(CBaseEntity* PMob);
+    void OnMobSpawn(CBaseEntity* PMob);
+    void OnMobRoamAction(CBaseEntity* PMob); // triggers when event mob is ready for a custom roam action
+    void OnMobRoam(CBaseEntity* PMob);
+    void OnMobEngage(CBaseEntity* PMob, CBaseEntity* PTarget);
+    void OnMobDisengage(CBaseEntity* PMob);
+    void OnMobFollow(CBaseEntity* PMob, CBaseEntity* PTarget);
+    void OnMobUnfollow(CBaseEntity* PMob, CBaseEntity* PTarget);
+    void OnMobFight(CBaseEntity* PMob, CBaseEntity* PTarget);
+    void OnCriticalHit(CBattleEntity* PMob, CBattleEntity* PAttacker);
+    void OnMobDeath(CBaseEntity* PMob, CBaseEntity* PKiller);
+    void OnMobDespawn(CBaseEntity* PMob);
 
-    int32 OnPetLevelRestriction(CBaseEntity* PMob);
+    void OnPlayerAbilityUse(CBaseEntity* PMob, CBaseEntity* PPlayer, CAbility* PAbility); // when a player uses an ability and mob is in notoriety container
 
-    int32 OnPath(CBaseEntity* PEntity);
-    int32 OnPathPoint(CBaseEntity* PEntity);
-    int32 OnPathComplete(CBaseEntity* PEntity);
+    void OnPetLevelRestriction(CBaseEntity* PMob);
 
-    int32 OnBattlefieldHandlerInitialise(CZone* PZone);
-    int32 OnBattlefieldInitialise(CBattlefield* PBattlefield); // what to do when initialising battlefield, battlefield:setLocalVar("lootId") here for any which have loot
-    int32 OnBattlefieldTick(CBattlefield* PBattlefield);
-    int32 OnBattlefieldStatusChange(CBattlefield* PBattlefield);
+    void OnPath(CBaseEntity* PEntity);
+    void OnPathPoint(CBaseEntity* PEntity);
+    void OnPathComplete(CBaseEntity* PEntity);
+
+    int32 OnBattlefieldHandlerInitialize(CZone* PZone);
+    void  OnBattlefieldInitialize(CBattlefield* PBattlefield); // what to do when initialising battlefield, battlefield:setLocalVar("lootId") here for any which have loot
+    void  OnBattlefieldTick(CBattlefield* PBattlefield);
+    void  OnBattlefieldStatusChange(CBattlefield* PBattlefield);
 
     void OnBattlefieldEnter(CCharEntity* PChar, CBattlefield* PBattlefield);
     void OnBattlefieldLeave(CCharEntity* PChar, CBattlefield* PBattlefield, uint8 LeaveCode); // see battlefield.h BATTLEFIELD_LEAVE_CODE
@@ -304,27 +400,28 @@ namespace luautils
 
     auto GetCachedInstanceScript(uint16 instanceId) -> sol::table;
 
-    int32 OnInstanceZoneIn(CCharEntity* PChar, CInstance* PInstance);
+    void  OnInstanceZoneIn(CCharEntity* PChar, CInstance* PInstance);
     void  AfterInstanceRegister(CBaseEntity* PChar);                             // triggers after a character is registered and zoned into an instance (the first time)
     int32 OnInstanceLoadFailed(CZone* PZone);                                    // triggers when an instance load is failed (ie. instance no longer exists)
-    int32 OnInstanceTimeUpdate(CZone* PZone, CInstance* PInstance, uint32 time); // triggers every second for an instance
-    int32 OnInstanceFailure(CInstance* PInstance);                               // triggers when an instance is failed
-    int32 OnInstanceCreatedCallback(CCharEntity* PChar, CInstance* PInstance);   // triggers when an instance is created (per character - waiting outside for entry)
-    int32 OnInstanceCreated(CInstance* PInstance);                               // triggers when an instance is created (instance setup)
-    int32 OnInstanceProgressUpdate(CInstance* PInstance);
-    int32 OnInstanceStageChange(CInstance* PInstance);
-    int32 OnInstanceComplete(CInstance* PInstance);
+    void  OnInstanceTimeUpdate(CZone* PZone, CInstance* PInstance, uint32 time); // triggers every second for an instance
+    void  OnInstanceFailure(CInstance* PInstance);                               // triggers when an instance is failed
+    void  OnInstanceCreatedCallback(CCharEntity* PChar, CInstance* PInstance);   // triggers when an instance is created (per character - waiting outside for entry)
+    void  OnInstanceCreated(CInstance* PInstance);                               // triggers when an instance is created (instance setup)
+    void  OnInstanceProgressUpdate(CInstance* PInstance);
+    void  OnInstanceStageChange(CInstance* PInstance);
+    void  OnInstanceComplete(CInstance* PInstance);
 
     uint32 GetMobRespawnTime(uint32 mobid);
     void   DisallowRespawn(uint32 mobid, bool allowRespawn);
     void   UpdateNMSpawnPoint(uint32 mobid);
 
-    std::string GetServerMessage(uint8 language); // Get the message to be delivered to player on first zone in of a session
+    std::string GetServerMessage(uint8 language);               // Get the message to be delivered to player on first zone in of a session
+    auto        GetRecentFishers(uint16 minutes) -> sol::table; // returns a list of recently active fishers (that fished in the last specified minutes)
 
-    int32 OnAdditionalEffect(CBattleEntity* PAttacker, CBattleEntity* PDefender, actionTarget_t* Action, int32 damage);                                      // for mobs with additional effects
-    int32 OnSpikesDamage(CBattleEntity* PDefender, CBattleEntity* PAttacker, actionTarget_t* Action, int32 damage);                                          // for mobs with spikes
+    void  OnAdditionalEffect(CBattleEntity* PAttacker, CBattleEntity* PDefender, actionTarget_t* Action, int32 damage);                                      // for mobs with additional effects
+    void  OnSpikesDamage(CBattleEntity* PDefender, CBattleEntity* PAttacker, actionTarget_t* Action, int32 damage);                                          // for mobs with spikes
     int32 additionalEffectAttack(CBattleEntity* PAttacker, CBattleEntity* PDefender, CItemWeapon* PItem, actionTarget_t* Action, int32 baseAttackDamage);    // for items with additional effects
-    int32 additionalEffectSpikes(CBattleEntity* PDefender, CBattleEntity* PAttacker, CItemEquipment* PItem, actionTarget_t* Action, int32 baseAttackDamage); // for armor with spikes
+    void  additionalEffectSpikes(CBattleEntity* PDefender, CBattleEntity* PAttacker, CItemEquipment* PItem, actionTarget_t* Action, int32 baseAttackDamage); // for armor with spikes
 
     auto NearLocation(sol::table const& table, float radius, float theta) -> sol::table;
     auto GetFurthestValidPosition(CLuaBaseEntity* fromTarget, float distance, float theta) -> sol::table;
@@ -336,7 +433,7 @@ namespace luautils
     void OnPlayerEmote(CCharEntity* PChar, Emote EmoteID);
     void OnPlayerVolunteer(CCharEntity* PChar, std::string const& text);
 
-    bool OnChocoboDig(CCharEntity* PChar, bool pre); // chocobo digging, pre = check
+    bool OnChocoboDig(CCharEntity* PChar);
 
     // Utility method: checks for and loads a lua function for events
     auto LoadEventScript(CCharEntity* PChar, const char* functionName) -> sol::function;
@@ -354,12 +451,22 @@ namespace luautils
 
     // Retrive the first itemId that matches a name
     uint16 GetItemIDByName(std::string const& name);
+    auto   SendItemToDeliveryBox(const std::string& playerName, uint16 itemId, uint32 quantity, const std::string& senderText) -> SendToDBoxReturnCode;
 
-    std::optional<CLuaBaseEntity> GenerateDynamicEntity(CZone* PZone, CInstance* PInstance, sol::table table);
+    auto GenerateDynamicEntity(CZone* PZone, CInstance* PInstance, sol::table table) -> CBaseEntity*;
+
+    // Fishing Contest
+    auto GetFishingContest() -> sol::table;
+    void InitNewFishingContest();
+    void SetContestParameters(uint16 fishId, uint8 measure, uint8 criteria);
+    void ProgressFishingContest();
+    void InitializeFishingContestSystem();
 
     template <typename... Targs>
     int32 invokeBattlefieldEvent(uint16 battlefieldId, const std::string& eventName, Targs... args);
 
+    auto GetSynergyRecipeByID(uint32 id) -> sol::table;
+    auto GetSynergyRecipeByTrade(CLuaTradeContainer luaTradeContainer) -> sol::table;
 }; // namespace luautils
 
 // template impl

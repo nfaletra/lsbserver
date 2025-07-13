@@ -1,10 +1,11 @@
 -----------------------------------
 -- Zone: Western Adoulin
 -----------------------------------
+---@type TZone
 local zoneObject = {}
 
 zoneObject.onInitialize = function(zone)
-    zone:registerTriggerArea(1, 13, 0, 123.518, 28, 0, 173) -- Approaching Airship Docks
+    zone:registerCuboidTriggerArea(1, 13, 0, 123.518, 28, 0, 173) -- Approaching Airship Docks
 end
 
 zoneObject.onZoneIn = function(player, prevZone)
@@ -44,7 +45,7 @@ zoneObject.onEventFinish = function(player, csid, option, npc)
 
         if option == 1 then
             -- Starts Quest: 'Raptor Rapture'
-            player:addQuest(xi.quest.log_id.ADOULIN, xi.quest.id.adoulin.RAPTOR_RAPTURE)
+            player:addQuest(xi.questLog.ADOULIN, xi.quest.id.adoulin.RAPTOR_RAPTURE)
             player:setCharVar('Raptor_Rapture_Status', 4)
         end
     elseif csid == 2 then

@@ -25,7 +25,7 @@
 
 #include "blue_trait.h"
 #include "entities/battleentity.h"
-#include "map.h"
+#include "map_server.h"
 #include "trait.h"
 
 /************************************************************************
@@ -54,56 +54,55 @@ namespace traits
      ************************************************************************/
     void LoadTraitsList()
     {
-        const char* Query = "SELECT traitid, job, level, rank, modifier, value, content_tag, meritid \
-                             FROM traits \
-                             WHERE traitid < %u \
-                             ORDER BY job, traitid ASC, rank DESC";
+        const char* Query = "SELECT traitid, job, level, rank, modifier, value, content_tag, meritid "
+                            "FROM traits "
+                            "WHERE traitid < %u "
+                            "ORDER BY job, traitid ASC, rank DESC";
 
-        int32 ret = sql->Query(Query, MAX_TRAIT_ID);
+        int32 ret = _sql->Query(Query, MAX_TRAIT_ID);
 
-        if (ret != SQL_ERROR && sql->NumRows() != 0)
+        if (ret != SQL_ERROR && _sql->NumRows() != 0)
         {
-            while (sql->NextRow() == SQL_SUCCESS)
+            while (_sql->NextRow() == SQL_SUCCESS)
             {
-                char* contentTag = nullptr;
-                sql->GetData(6, &contentTag, nullptr);
-
+                // const auto contentTag = rset->getOrDefault<std::string>("content_tag", "");
+                const auto contentTag = _sql->GetStringData(6);
                 if (!luautils::IsContentEnabled(contentTag))
                 {
                     continue;
                 }
 
-                CTrait* PTrait = new CTrait(sql->GetIntData(0));
+                CTrait* PTrait = new CTrait(_sql->GetIntData(0));
 
-                PTrait->setJob(sql->GetIntData(1));
-                PTrait->setLevel(sql->GetIntData(2));
-                PTrait->setRank(sql->GetIntData(3));
-                PTrait->setMod(static_cast<Mod>(sql->GetIntData(4)));
-                PTrait->setValue(sql->GetIntData(5));
-                PTrait->setMeritId(sql->GetIntData(7));
+                PTrait->setJob(_sql->GetIntData(1));
+                PTrait->setLevel(_sql->GetIntData(2));
+                PTrait->setRank(_sql->GetIntData(3));
+                PTrait->setMod(static_cast<Mod>(_sql->GetIntData(4)));
+                PTrait->setValue(_sql->GetIntData(5));
+                PTrait->setMeritId(_sql->GetIntData(7));
 
                 PTraitsList[PTrait->getJob()].emplace_back(PTrait);
             }
         }
 
-        Query = "SELECT trait_category, trait_points_needed, traitid, modifier, value \
-                             FROM blue_traits \
-                             WHERE traitid < %u \
-                             ORDER BY trait_category ASC, trait_points_needed DESC";
+        Query = "SELECT trait_category, trait_points_needed, traitid, modifier, value "
+                "FROM blue_traits "
+                "WHERE traitid < %u "
+                "ORDER BY trait_category ASC, trait_points_needed DESC";
 
-        ret = sql->Query(Query, MAX_TRAIT_ID);
+        ret = _sql->Query(Query, MAX_TRAIT_ID);
 
-        if (ret != SQL_ERROR && sql->NumRows() != 0)
+        if (ret != SQL_ERROR && _sql->NumRows() != 0)
         {
-            while (sql->NextRow() == SQL_SUCCESS)
+            while (_sql->NextRow() == SQL_SUCCESS)
             {
-                CBlueTrait* PTrait = new CBlueTrait(sql->GetIntData(0), sql->GetIntData(2));
+                CBlueTrait* PTrait = new CBlueTrait(_sql->GetIntData(0), _sql->GetIntData(2));
 
                 PTrait->setJob(JOB_BLU);
                 PTrait->setRank(1);
-                PTrait->setPoints(sql->GetIntData(1));
-                PTrait->setMod(static_cast<Mod>(sql->GetIntData(3)));
-                PTrait->setValue(sql->GetIntData(4));
+                PTrait->setPoints(_sql->GetIntData(1));
+                PTrait->setMod(static_cast<Mod>(_sql->GetIntData(3)));
+                PTrait->setValue(_sql->GetIntData(4));
 
                 PTraitsList[JOB_BLU].emplace_back(PTrait);
             }
@@ -115,9 +114,9 @@ namespace traits
         // Manually cleanup traits list
         for (auto jobTraitList : PTraitsList)
         {
-            for (auto traitList : jobTraitList)
+            for (auto trait : jobTraitList)
             {
-                destroy(traitList);
+                destroy(trait);
             }
             jobTraitList.clear();
         }

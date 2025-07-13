@@ -102,7 +102,8 @@ mission.sections =
                 onTrigger = function(player, npc)
                     if
                         player:getMissionStatus(mission.areaId) == 3 and
-                        mission:getVar(player, 'Option') == 1
+                        mission:getVar(player, 'Option') == 1 and
+                        mission:getVar(player, 'GumbahDialog') == 1
                     then
                         return mission:progressEvent(177)
                     end
@@ -125,8 +126,13 @@ mission.sections =
 
             onEventFinish =
             {
+                [175] = function(player, csid, option, npc)
+                    mission:setVar(player, 'GumbahDialog', 1)
+                end,
+
                 [177] = function(player, csid, option, npc)
                     mission:setVar(player, 'Option', 0)
+                    player:delKeyItem(xi.ki.LETTER_FROM_WEREI)
                 end,
             },
         },
@@ -181,12 +187,12 @@ mission.sections =
                     local blockingOption = mission:getVar(player, 'Option')
 
                     if mission:complete(player) then
-                        -- Cornelia has two options for which CS is displayed, depending on quest
-                        -- completion.  This variable is cleared after viewing.
+                        -- Cornelia has two options for which CS is displayed, depending on quest completion.
+                        -- This variable is cleared after viewing.
                         mission:setVar(player, 'Stage', 1)
 
-                        -- Gumbah dialogue is blocking before being able to progress.  If this wasn't
-                        -- completed, make sure this var persists.
+                        -- Gumbah dialogue is blocking before being able to progress.
+                        -- If this wasn't completed, make sure this var persists.
                         if blockingOption == 1 then
                             mission:setVar(player, 'Option', 1)
                         end
@@ -235,7 +241,7 @@ mission.sections =
                 [32001] = function(player, csid, option, npc)
                     if
                         player:getMissionStatus(mission.areaId) == 2 and
-                        player:getLocalVar('battlefieldWin') == 67
+                        player:getLocalVar('battlefieldWin') == xi.battlefield.id.ON_MY_WAY
                     then
                         npcUtil.giveKeyItem(player, xi.ki.LETTER_FROM_WEREI)
                         player:setMissionStatus(mission.areaId, 3)
@@ -260,13 +266,28 @@ mission.sections =
 
         [xi.zone.BASTOK_MINES] =
         {
-            ['Gumbah'] = mission:progressEvent(177),
+            ['Gumbah'] =
+            {
+                onTrigger = function(player, npc)
+                    if mission:getVar(player, 'GumbahDialog') == 1 then
+                        return mission:progressEvent(177)
+                    else
+                        return mission:progressEvent(175)
+                    end
+                end,
+            },
+
             ['Rashid'] = mission:progressEvent(1011),
 
             onEventFinish =
             {
+                [175] = function(player, csid, option, npc)
+                    mission:setVar(player, 'GumbahDialog', 1)
+                end,
+
                 [177] = function(player, csid, option, npc)
                     mission:setVar(player, 'Option', 0)
+                    player:delKeyItem(xi.ki.LETTER_FROM_WEREI)
                 end,
             },
         },
@@ -295,9 +316,9 @@ mission.sections =
             {
                 onTrigger = function(player, npc)
                     if
-                        player:hasCompletedQuest(xi.quest.log_id.BASTOK, xi.quest.id.bastok.BEAUTY_AND_THE_GALKA) and
-                        player:hasCompletedQuest(xi.quest.log_id.BASTOK, xi.quest.id.bastok.FALLEN_COMRADES) and
-                        player:hasCompletedQuest(xi.quest.log_id.BASTOK, xi.quest.id.bastok.RIVALS)
+                        player:hasCompletedQuest(xi.questLog.BASTOK, xi.quest.id.bastok.BEAUTY_AND_THE_GALKA) and
+                        player:hasCompletedQuest(xi.questLog.BASTOK, xi.quest.id.bastok.FALLEN_COMRADES) and
+                        player:hasCompletedQuest(xi.questLog.BASTOK, xi.quest.id.bastok.RIVALS)
                     then
                         return mission:progressEvent(622)
                     else

@@ -7,11 +7,12 @@
 mixins = { require('scripts/mixins/job_special') }
 local ID = zones[xi.zone.QULUN_DOME]
 -----------------------------------
+---@type TMobEntity
 local entity = {}
 
 entity.onMobInitialize = function(mob)
     -- the quest version of this NM doesn't drop gil
-    if mob:getID() >= ID.mob.AFFABLE_ADAMANTKING_OFFSET then
+    if mob:getID() >= ID.mob.DIAMOND_QUADAV + 2 then
         mob:setMobMod(xi.mobMod.GIL_MAX, -1)
     end
 end
@@ -36,7 +37,7 @@ entity.onMobDespawn = function(mob)
         local kills = GetServerVariable('[PH]Za_Dha_Adamantking')
         local popNow = (math.random(1, 5) == 3 or kills > 6)
 
-        if os.time() > timeOfDeath and popNow then
+        if GetSystemTime() > timeOfDeath and popNow then
             DisallowRespawn(nqId, true)
             DisallowRespawn(hqId, false)
             UpdateNMSpawnPoint(hqId)

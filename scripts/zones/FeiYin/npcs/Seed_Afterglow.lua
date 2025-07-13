@@ -14,10 +14,8 @@
 -----------------------------------
 local ID = zones[xi.zone.FEIYIN]
 -----------------------------------
+---@type TNpcEntity
 local entity = {}
-
-entity.onTrade = function(player, npc, trade)
-end
 
 entity.onTrigger = function(player, npc)
     local offset               = npc:getID() - ID.npc.AFTERGRLOW_OFFSET
@@ -30,8 +28,8 @@ entity.onTrigger = function(player, npc)
         player:hasKeyItem(xi.ki.MARK_OF_SEED) or
         player:hasKeyItem(xi.ki.AZURE_KEY) or
         player:hasKeyItem(xi.ki.IVORY_KEY) or
-        os.time() < player:getCharVar('LastAzureKey') or
-        os.time() < player:getCharVar('LastIvoryKey') or
+        GetSystemTime() < player:getCharVar('LastAzureKey') or
+        GetSystemTime() < player:getCharVar('LastIvoryKey') or
         aCrystallineProphecy < xi.mission.id.acp.THOSE_WHO_LURK_IN_SHADOWS_II
     then
         player:messageSpecial(ID.text.SOFTLY_SHIMMERING_LIGHT)
@@ -60,9 +58,6 @@ entity.onTrigger = function(player, npc)
     else
         player:messageSpecial(ID.text.SOFTLY_SHIMMERING_LIGHT)
     end
-end
-
-entity.onEventUpdate = function(player, csid, option, npc)
 end
 
 entity.onEventFinish = function(player, csid, option, npc)

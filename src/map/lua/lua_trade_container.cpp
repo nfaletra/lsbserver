@@ -45,7 +45,7 @@ uint32 CLuaTradeContainer::getGil()
     return itemID == 0xFFFF ? m_pMyTradeContainer->getQuantity(0) : 0;
 }
 
-std::optional<CLuaItem> CLuaTradeContainer::getItem(sol::object const& SlotIDObj)
+auto CLuaTradeContainer::getItem(sol::object const& SlotIDObj) -> CItem*
 {
     uint8 SlotID = 0;
     if (SlotIDObj.is<uint8>())
@@ -53,12 +53,7 @@ std::optional<CLuaItem> CLuaTradeContainer::getItem(sol::object const& SlotIDObj
         SlotID = SlotIDObj.as<uint8>();
     }
 
-    if (auto PItem = m_pMyTradeContainer->getItem(SlotID))
-    {
-        return std::optional<CLuaItem>(PItem);
-    }
-
-    return std::nullopt;
+    return m_pMyTradeContainer->getItem(SlotID);
 }
 
 //======================================================//
@@ -172,6 +167,13 @@ bool CLuaTradeContainer::confirmSlot(uint8 slotID, sol::object const& amountObj)
 
 //======================================================//
 
+void CLuaTradeContainer::clean()
+{
+    m_pMyTradeContainer->Clean();
+}
+
+//======================================================//
+
 void CLuaTradeContainer::Register()
 {
     SOL_USERTYPE("CTradeContainer", CLuaTradeContainer);
@@ -186,6 +188,7 @@ void CLuaTradeContainer::Register()
     SOL_REGISTER("hasItemQty", CLuaTradeContainer::hasItemQty);
     SOL_REGISTER("confirmItem", CLuaTradeContainer::confirmItem);
     SOL_REGISTER("confirmSlot", CLuaTradeContainer::confirmSlot);
+    SOL_REGISTER("clean", CLuaTradeContainer::clean);
 }
 
 std::ostream& operator<<(std::ostream& os, const CLuaTradeContainer& trade)

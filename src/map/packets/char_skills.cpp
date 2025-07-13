@@ -19,7 +19,6 @@
 ===========================================================================
 */
 
-#include "common/socket.h"
 #include "common/timer.h"
 
 #include <cstring>
@@ -33,7 +32,7 @@ CCharSkillsPacket::CCharSkillsPacket(CCharEntity* PChar)
     this->setType(0x62);
     this->setSize(0x100);
 
-    memcpy(data + (0x80), &PChar->WorkingSkills, 128);
+    std::memcpy(buffer_.data() + 0x80, &PChar->WorkingSkills, 128);
 
     // remove automaton skills from this menu (they are in another packet)
     ref<uint16>(0xAC) = 0x8000;

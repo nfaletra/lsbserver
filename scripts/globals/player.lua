@@ -167,21 +167,19 @@ xi.player.onGameIn = function(player, firstLogin, zoning)
             player:messageSpecial(ID.text.ABYSSEA_TIME_OFFSET + 8)
             player:setPos(unpack(xi.abyssea.exitPositions[zoneID]))
         end
-
-        player:setLocalVar('gameLogin', 0)
     end
 
     -- Abyssea starting quest should be flagged when expansion is active
     if
         xi.settings.main.ENABLE_ABYSSEA == 1 and
-        player:getQuestStatus(xi.quest.log_id.ABYSSEA, xi.quest.id.abyssea.A_JOURNEY_BEGINS) == QUEST_AVAILABLE
+        player:getQuestStatus(xi.questLog.ABYSSEA, xi.quest.id.abyssea.A_JOURNEY_BEGINS) == xi.questStatus.QUEST_AVAILABLE
     then
-        player:addQuest(xi.quest.log_id.ABYSSEA, xi.quest.id.abyssea.A_JOURNEY_BEGINS)
+        player:addQuest(xi.questLog.ABYSSEA, xi.quest.id.abyssea.A_JOURNEY_BEGINS)
     end
 
     -- This is for migration safety only, and should be removed at a later date
     if
-        player:hasCompletedQuest(xi.quest.log_id.ABYSSEA, xi.quest.id.abyssea.A_JOURNEY_BEGINS) and
+        player:hasCompletedQuest(xi.questLog.ABYSSEA, xi.quest.id.abyssea.A_JOURNEY_BEGINS) and
         player:getTraverserEpoch() == 0
     then
         player:setTraverserEpoch()
@@ -228,13 +226,19 @@ xi.player.onGameIn = function(player, firstLogin, zoning)
     end
 
     -- remember time player zoned in (e.g., to support zone-in delays)
-    player:setLocalVar('ZoneInTime', os.time())
+    player:setLocalVar('ZoneInTime', GetSystemTime())
+    player:setLocalVar('ZoningIn', 1)
 
     -- Slight delay to ensure player is fully logged in
     player:timer(2500, function(playerArg)
+        player:setLocalVar('ZoningIn', 0)
         -- Login Campaign rewards points once daily
         xi.events.loginCampaign.onGameIn(playerArg)
     end)
+
+    -- Enforce that gameLogin is always set to 0 once this method exits
+    -- This assists with ensuring Abyssea visitant status is handled properly on logins
+    player:setLocalVar('gameLogin', 0)
 end
 
 xi.player.onPlayerDeath = function(player)

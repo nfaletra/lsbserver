@@ -37,6 +37,7 @@
 #include "utils/mobutils.h"
 #include "utils/petutils.h"
 
+#include "common/timer.h"
 #include "common/utils.h"
 #include "petentity.h"
 
@@ -45,21 +46,24 @@ CPetEntity::CPetEntity(PET_TYPE petType)
 , m_PetID(0)
 , m_PetType(petType)
 , m_spawnLevel(0)
-, m_jugSpawnTime(time_point::min())
-, m_jugDuration(duration::min())
+, m_jugSpawnTime(timer::time_point::min())
+, m_jugDuration(timer::duration::min())
 {
+    TracyZoneScoped;
     objtype                     = TYPE_PET;
     m_EcoSystem                 = ECOSYSTEM::UNCLASSIFIED;
     allegiance                  = ALLEGIANCE_TYPE::PLAYER;
     m_MobSkillList              = 0;
-    m_IsClaimable               = false;
     m_bReleaseTargIDOnDisappear = true;
     spawnAnimation              = SPAWN_ANIMATION::SPECIAL; // Initial spawn has the special spawn-in animation
 
     PAI = std::make_unique<CAIContainer>(this, std::make_unique<CPathFind>(this), std::make_unique<CPetController>(this), std::make_unique<CTargetFind>(this));
 }
 
-CPetEntity::~CPetEntity() = default;
+CPetEntity::~CPetEntity()
+{
+    TracyZoneScoped;
+}
 
 PET_TYPE CPetEntity::getPetType()
 {
@@ -81,19 +85,17 @@ bool CPetEntity::isBstPet()
     return getPetType() == PET_TYPE::JUG_PET || objtype == TYPE_MOB;
 }
 
-int32 CPetEntity::getJugSpawnTime()
+timer::time_point CPetEntity::getJugSpawnTime()
 {
     if (m_PetType != PET_TYPE::JUG_PET)
     {
         ShowWarning("Non-Jug Pet calling function (%d).", static_cast<uint8>(m_PetType));
-        return 0;
     }
 
-    const auto epoch = m_jugSpawnTime.time_since_epoch();
-    return static_cast<int32>(std::chrono::duration_cast<std::chrono::seconds>(epoch).count());
+    return m_jugSpawnTime;
 }
 
-void CPetEntity::setJugSpawnTime(int32 spawnTime)
+void CPetEntity::setJugSpawnTime(timer::time_point spawnTime)
 {
     if (m_PetType != PET_TYPE::JUG_PET)
     {
@@ -101,21 +103,21 @@ void CPetEntity::setJugSpawnTime(int32 spawnTime)
         return;
     }
 
-    m_jugSpawnTime = std::chrono::system_clock::time_point(std::chrono::duration<int>(spawnTime));
+    m_jugSpawnTime = spawnTime;
 }
 
-int32 CPetEntity::getJugDuration()
+timer::duration CPetEntity::getJugDuration()
 {
     if (m_PetType != PET_TYPE::JUG_PET)
     {
         ShowWarning("Non-Jug Pet calling function (%d).", static_cast<uint8>(m_PetType));
-        return 0;
+        return 0s;
     }
 
-    return static_cast<int32>(std::chrono::duration_cast<std::chrono::seconds>(m_jugDuration).count());
+    return m_jugDuration;
 }
 
-void CPetEntity::setJugDuration(int32 seconds)
+void CPetEntity::setJugDuration(timer::duration seconds)
 {
     if (m_PetType != PET_TYPE::JUG_PET)
     {
@@ -123,7 +125,7 @@ void CPetEntity::setJugDuration(int32 seconds)
         return;
     }
 
-    m_jugDuration = std::chrono::seconds(seconds);
+    m_jugDuration = seconds;
 }
 
 const std::string CPetEntity::GetScriptName()
@@ -201,7 +203,7 @@ WYVERN_TYPE CPetEntity::getWyvernType()
 void CPetEntity::PostTick()
 {
     CBattleEntity::PostTick();
-    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    timer::time_point now = timer::now();
     if (loc.zone && updatemask && status != STATUS_TYPE::DISAPPEAR && now > m_nextUpdateTimer)
     {
         m_nextUpdateTimer = now + 250ms;
@@ -209,7 +211,7 @@ void CPetEntity::PostTick()
 
         if (PMaster && PMaster->PPet == this)
         {
-            ((CCharEntity*)PMaster)->pushPacket(new CPetSyncPacket((CCharEntity*)PMaster));
+            ((CCharEntity*)PMaster)->pushPacket<CPetSyncPacket>((CCharEntity*)PMaster);
         }
 
         updatemask = 0;
@@ -259,34 +261,13 @@ void CPetEntity::Spawn()
 
     if (m_PetType == PET_TYPE::JUG_PET)
     {
-        m_jugSpawnTime = server_clock::now();
+        m_jugSpawnTime = timer::now();
     }
 
     // NOTE: This is purposefully calling CBattleEntity's impl.
     // TODO: Calling a grand-parent's impl. of an overridden function is bad
     CBattleEntity::Spawn();
     luautils::OnMobSpawn(this);
-}
-
-bool CPetEntity::shouldDespawn(time_point tick)
-{
-    // This check was moved from the original call site when this method was added.
-    // It is in theory not needed, but we are not removing it without further testing.
-    // TODO: Consider removing this when possible.
-    if (isCharmed && tick > charmTime)
-    {
-        return true;
-    }
-
-    if (PMaster != nullptr &&
-        PAI->IsSpawned() &&
-        m_PetType == PET_TYPE::JUG_PET &&
-        tick > m_jugSpawnTime + m_jugDuration)
-    {
-        return true;
-    }
-
-    return false;
 }
 
 void CPetEntity::loadPetZoningInfo()
@@ -449,12 +430,12 @@ void CPetEntity::OnPetSkillFinished(CPetSkillState& state, action_t& action)
     {
         if (PSkill->isAoE())
         {
-            PAI->TargetFind->findWithinArea(PTarget, static_cast<AOE_RADIUS>(PSkill->getAoe()), PSkill->getRadius(), findFlags);
+            PAI->TargetFind->findWithinArea(PTarget, static_cast<AOE_RADIUS>(PSkill->getAoe()), PSkill->getRadius(), findFlags, PSkill->getValidTargets());
         }
         else if (PSkill->isConal())
         {
             float angle = 45.0f;
-            PAI->TargetFind->findWithinCone(PTarget, distance, angle, findFlags);
+            PAI->TargetFind->findWithinCone(PTarget, distance, angle, findFlags, PSkill->getValidTargets());
         }
         else
         {
@@ -467,7 +448,7 @@ void CPetEntity::OnPetSkillFinished(CPetSkillState& state, action_t& action)
                 }
             }
 
-            PAI->TargetFind->findSingleTarget(PTarget, findFlags);
+            PAI->TargetFind->findSingleTarget(PTarget, findFlags, PSkill->getValidTargets());
         }
     }
     else // Out of range
@@ -502,6 +483,7 @@ void CPetEntity::OnPetSkillFinished(CPetSkillState& state, action_t& action)
     }
 
     PSkill->setTotalTargets(targets);
+    PSkill->setPrimaryTargetID(PTarget->id);
     PSkill->setTP(state.GetSpentTP());
     PSkill->setHPP(GetHPP());
 
@@ -586,7 +568,7 @@ void CPetEntity::OnPetSkillFinished(CPetSkillState& state, action_t& action)
         {
             target.speceffect = SPECEFFECT::RECOIL;
             target.knockback  = PSkill->getKnockback();
-            if (first && (PSkill->getPrimarySkillchain() != 0))
+            if (first && PTargetFound->health.hp > 0 && PSkill->getPrimarySkillchain() != 0)
             {
                 SUBEFFECT effect = battleutils::GetSkillChainEffect(PTargetFound, PSkill->getPrimarySkillchain(), PSkill->getSecondarySkillchain(),
                                                                     PSkill->getTertiarySkillchain());

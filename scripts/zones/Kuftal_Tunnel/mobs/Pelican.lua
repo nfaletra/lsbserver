@@ -2,10 +2,18 @@
 -- Area: Kuftal Tunnel
 --   NM: Pelican
 -----------------------------------
+---@type TMobEntity
 local entity = {}
 
 entity.onMobInitialize = function(mob)
     mob:setMobMod(xi.mobMod.ADD_EFFECT, 1)
+    mob:setMobMod(xi.mobMod.GIL_MIN, 18000)
+    mob:setMobMod(xi.mobMod.GIL_MAX, 18000)
+end
+
+entity.onMobSpawn = function(mob)
+    mob:addImmunity(xi.immunity.DARK_SLEEP)
+    mob:addImmunity(xi.immunity.LIGHT_SLEEP)
 end
 
 entity.onAdditionalEffect = function(mob, target, damage)

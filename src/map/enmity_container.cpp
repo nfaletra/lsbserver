@@ -1,25 +1,26 @@
 ﻿/*
 ===========================================================================
 
-Copyright (c) 2010-2015 Darkstar Dev Teams
+  Copyright (c) 2010-2015 Darkstar Dev Teams
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see http://www.gnu.org/licenses/
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see http://www.gnu.org/licenses/
 
 ===========================================================================
 */
 
 #include "common/logging.h"
+#include "common/settings.h"
 #include "common/utils.h"
 
 #include "ai/ai_container.h"
@@ -167,9 +168,20 @@ void CEnmityContainer::UpdateEnmity(CBattleEntity* PEntity, int32 CE, int32 VE, 
     }
 
     // Apply TH only if this was a direct action
-    if (directAction && PEntity->getMod(Mod::TREASURE_HUNTER) > m_EnmityHolder->m_THLvl)
+    if (directAction)
     {
-        m_EnmityHolder->m_THLvl = PEntity->getMod(Mod::TREASURE_HUNTER);
+        int16 THlevel = std::min<int16>(8, PEntity->getMod(Mod::TREASURE_HUNTER));
+
+        // Enforce TH8 as max for THF main and TH4 as non-THF main
+        if (PEntity->GetMJob() != JOB_THF)
+        {
+            THlevel = std::min<int16>(4, PEntity->getMod(Mod::TREASURE_HUNTER));
+        }
+
+        if (m_EnmityHolder->m_THLvl < THlevel)
+        {
+            m_EnmityHolder->m_THLvl = THlevel;
+        }
     }
 
     auto enmity_obj = m_EnmityList.find(PEntity->id);
@@ -306,10 +318,10 @@ void CEnmityContainer::LowerEnmityByPercent(CBattleEntity* PEntity, uint8 percen
     {
         float mod = ((float)(percent) / 100.0f);
 
-        auto CEValue = (int16)(enmity_obj->second.CE * mod);
+        auto CEValue = (int32)(enmity_obj->second.CE * mod);
         enmity_obj->second.CE -= (CEValue < 0 ? 0 : CEValue);
 
-        auto VEValue = (int16)(enmity_obj->second.VE * mod);
+        auto VEValue = (int32)(enmity_obj->second.VE * mod);
         enmity_obj->second.VE -= (VEValue < 0 ? 0 : VEValue);
 
         // transfer hate if HateReceiver not nullptr
@@ -381,17 +393,27 @@ void CEnmityContainer::SetVE(CBattleEntity* PEntity, const int32 amount)
 void CEnmityContainer::UpdateEnmityFromDamage(CBattleEntity* PEntity, int32 Damage)
 {
     TracyZoneScoped;
-    Damage          = (Damage < 1 ? 1 : Damage);
-    int16 damageMod = battleutils::GetEnmityModDamage(m_EnmityHolder->GetMLevel());
 
-    int32 CE = (int32)(80.f / damageMod * Damage);
-    int32 VE = (int32)(240.f / damageMod * Damage);
-
-    UpdateEnmity(PEntity, CE, VE);
-
-    if (m_EnmityHolder && m_EnmityHolder->m_HiPCLvl < PEntity->GetMLevel())
+    if (PEntity && m_EnmityHolder)
     {
-        m_EnmityHolder->m_HiPCLvl = PEntity->GetMLevel();
+        // Don't add enmity to yourself
+        if (m_EnmityHolder->id == PEntity->id)
+        {
+            return;
+        }
+
+        Damage          = (Damage < 1 ? 1 : Damage);
+        int16 damageMod = battleutils::GetEnmityModDamage(m_EnmityHolder->GetMLevel());
+
+        int32 CE = (int32)(80.f / damageMod * Damage);
+        int32 VE = (int32)(240.f / damageMod * Damage);
+
+        UpdateEnmity(PEntity, CE, VE);
+
+        if (m_EnmityHolder->m_HiPCLvl < PEntity->GetMLevel())
+        {
+            m_EnmityHolder->m_HiPCLvl = PEntity->GetMLevel();
+        }
     }
 }
 
@@ -477,7 +499,7 @@ void CEnmityContainer::DecayEnmity()
     for (auto& it : m_EnmityList)
     {
         EnmityObject_t& PEnmityObject = it.second;
-        constexpr int   decay_amount  = (int)(60 / server_tick_rate);
+        constexpr int   decay_amount  = (int)(60 / kLogicUpdateRate); // TODO: This should decay relative to the delta tick time?
 
         PEnmityObject.VE -= PEnmityObject.VE > decay_amount ? decay_amount : PEnmityObject.VE;
     }
@@ -489,8 +511,8 @@ bool CEnmityContainer::IsWithinEnmityRange(CBattleEntity* PEntity) const
     {
         return false;
     }
-    float maxRange = square(m_EnmityHolder->m_Type == MOBTYPE_NOTORIOUS ? 28.f : 25.f);
-    return distanceSquared(m_EnmityHolder->loc.p, PEntity->loc.p) <= maxRange;
+    float maxRange = m_EnmityHolder->m_Type == MOBTYPE_NOTORIOUS ? 28.0f : 25.0f;
+    return isWithinDistance(m_EnmityHolder->loc.p, PEntity->loc.p, maxRange);
 }
 
 EnmityList_t* CEnmityContainer::GetEnmityList()

@@ -1,20 +1,20 @@
 ﻿/*
 ===========================================================================
 
-Copyright (c) 2023 LandSandBoat Dev Teams
+  Copyright (c) 2023 LandSandBoat Dev Teams
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see http://www.gnu.org/licenses/
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see http://www.gnu.org/licenses/
 
 ===========================================================================
 */
@@ -25,8 +25,8 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 
 #include <common/md52.h>
 #include <common/mmo.h>
-#include <common/socket.h> // for ref<T>
 #include <common/sql.h>
+#include <common/utils.h>
 #include <common/xirand.h>
 
 #include "login_errors.h"
@@ -78,17 +78,12 @@ namespace loginHelpers
         UNUSED_FEATURE_9 = 0x8000,
     };
 
-    bool check_string(std::string const& str, std::size_t max_length);
+    bool isStringMalformed(std::string const& str, std::size_t max_length);
 
     session_t& get_authenticated_session(std::string const& ipAddr, std::string const& sessionHash);
 
-    // hostname/ip conversion functions
-    std::string ip2str(uint32 ip);
-
-    uint32 str2ip(const char* ip_str);
-
     // https://github.com/atom0s/XiPackets/blob/main/lobby/S2C_0x0004_ResponseError.md
-    void generateErrorMessage(char* packet, uint16 errorCode);
+    void generateErrorMessage(uint8* packet, uint16 errorCode);
 
     uint16 generateExpansionBitmask();
 
@@ -96,9 +91,7 @@ namespace loginHelpers
 
     int32 saveCharacter(uint32 accid, uint32 charid, char_mini* createchar);
 
-    int32 createCharacter(session_t& session, char* buf);
+    int32 createCharacter(session_t& session, uint8* buf);
 
-    void PrintPacket(const char* data, uint32 size);
-
-    std::string getHashFromPacket(std::string const& ip_str, char* data);
+    std::string getHashFromPacket(std::string const& ip_str, uint8* data);
 } // namespace loginHelpers

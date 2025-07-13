@@ -28,13 +28,13 @@
 
 CItemContainer::CItemContainer(uint16 LocationID)
 : SortingPacket(0)
-, LastSortingTime(0)
+, LastSortingTime(timer::time_point::min())
 , m_id(LocationID)
 , m_buff(0)
 , m_size(0)
 , m_count(0)
 {
-    memset(m_ItemList, 0, sizeof(m_ItemList));
+    std::memset(m_ItemList, 0, sizeof(m_ItemList));
 }
 
 CItemContainer::~CItemContainer()
@@ -74,7 +74,7 @@ uint16 CItemContainer::GetBuff() const
 uint8 CItemContainer::AddBuff(int8 buff)
 {
     m_buff += buff;
-    return SetSize(std::clamp<uint8>((uint8)m_buff, 0, 80)); // Limit in 0-80 cells for character
+    return SetSize(std::clamp<int>(m_buff, 0, 80)); // Limit in 0-80 cells for character
 }
 
 /************************************************************************
@@ -182,12 +182,13 @@ uint8 CItemContainer::InsertItem(CItem* PItem, uint8 SlotID)
     return ERROR_SLOTID;
 }
 
-CItem* CItemContainer::GetItem(uint8 SlotID)
+CItem* CItemContainer::GetItem(uint8 slotID) const
 {
-    if (SlotID <= m_size)
+    if (slotID <= m_size)
     {
-        return m_ItemList[SlotID];
+        return m_ItemList[slotID];
     }
+
     return nullptr;
 }
 
@@ -201,6 +202,20 @@ uint8 CItemContainer::SearchItem(uint16 ItemID)
         }
     }
     return ERROR_SLOTID;
+}
+
+auto CItemContainer::SearchItems(uint16 ItemID) -> std::vector<uint8>
+{
+    std::vector<uint8> SlotIDs;
+
+    for (uint8 SlotID = 0; SlotID <= m_size; ++SlotID)
+    {
+        if ((m_ItemList[SlotID] != nullptr) && (m_ItemList[SlotID]->getID() == ItemID))
+        {
+            SlotIDs.push_back(SlotID);
+        }
+    }
+    return SlotIDs;
 }
 
 uint8 CItemContainer::SearchItemWithSpace(uint16 ItemID, uint32 quantity)

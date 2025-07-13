@@ -19,8 +19,6 @@
 ===========================================================================
 */
 
-#include "common/socket.h"
-
 #include <cstring>
 
 #include "bazaar_close.h"
@@ -31,5 +29,5 @@ CBazaarClosePacket::CBazaarClosePacket(CCharEntity* PChar)
     this->setType(0x107);
     this->setSize(0x16);
 
-    memcpy(data + (0x04), PChar->getName().c_str(), PChar->getName().size());
+    std::memcpy(buffer_.data() + 0x04, PChar->getName().c_str(), PChar->getName().size());
 }

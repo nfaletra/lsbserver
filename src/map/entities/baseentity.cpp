@@ -21,10 +21,15 @@
 
 #include "baseentity.h"
 
+#include "common/tracy.h"
+
 #include "ai/ai_container.h"
+
 #include "battlefield.h"
 #include "instance.h"
-#include "map.h"
+#include "los/zone_los.h"
+#include "map_server.h"
+#include "navmesh.h"
 #include "zone.h"
 
 #include <cstring>
@@ -37,23 +42,27 @@ CBaseEntity::CBaseEntity()
 , m_TargID(0)
 , animation(0)
 , animationsub(0)
-, speed(50 + settings::get<int8>("map.SPEED_MOD")) // It is downright dumb to init every entity at PLAYER speed, but until speed is reworked this hack stays.
-, speedsub(50)                                     // Retail does NOT adjust this when speed is adjusted.
+, baseSpeed(settings::get<uint8>("map.BASE_SPEED"))
 , namevis(0)
 , allegiance(ALLEGIANCE_TYPE::MOB)
 , updatemask(0)
+, priorityRender(false)
 , isRenamed(false)
 , m_bReleaseTargIDOnDisappear(false)
 , spawnAnimation(SPAWN_ANIMATION::NORMAL)
 , PAI(nullptr)
 , PBattlefield(nullptr)
 , PInstance(nullptr)
-, m_nextUpdateTimer(std::chrono::steady_clock::now())
+, m_nextUpdateTimer(timer::now())
 {
+    TracyZoneScoped;
+    speed          = baseSpeed;
+    animationSpeed = static_cast<uint8>(std::clamp<float>((baseSpeed / settings::get<float>("map.ANIMATION_SPEED_DIVISOR")), std::numeric_limits<uint8>::min(), std::numeric_limits<uint8>::max()));
 }
 
 CBaseEntity::~CBaseEntity()
 {
+    TracyZoneScoped;
     if (PBattlefield)
     {
         PBattlefield->RemoveEntity(this, BATTLEFIELD_LEAVE_CODE_WARPDC);
@@ -66,7 +75,7 @@ void CBaseEntity::Spawn()
     updatemask |= UPDATE_HP;
     ResetLocalVars();
     PAI->Reset();
-    PAI->EventHandler.triggerListener("SPAWN", CLuaBaseEntity(this));
+    PAI->EventHandler.triggerListener("SPAWN", this);
 }
 
 void CBaseEntity::FadeOut()
@@ -108,6 +117,18 @@ float CBaseEntity::GetZPos() const
 uint8 CBaseEntity::GetRotPos() const
 {
     return loc.p.rotation;
+}
+
+uint8 CBaseEntity::GetSpeed() const
+{
+    return speed;
+}
+
+uint8 CBaseEntity::UpdateSpeed(bool run)
+{
+    std::ignore = run;
+    speed       = baseSpeed;
+    return speed;
 }
 
 void CBaseEntity::HideName(bool hide)
@@ -197,12 +218,17 @@ void CBaseEntity::ResetLocalVars()
     m_localVars.clear();
 }
 
-uint32 CBaseEntity::GetLocalVar(std::string var)
+uint32 CBaseEntity::GetLocalVar(const std::string& var)
 {
     return m_localVars[var];
 }
 
-void CBaseEntity::SetLocalVar(std::string var, uint32 val)
+std::map<std::string, uint32>& CBaseEntity::GetLocalVars()
+{
+    return m_localVars;
+}
+
+void CBaseEntity::SetLocalVar(const std::string& var, uint32 val)
 {
     m_localVars[var] = val;
 }

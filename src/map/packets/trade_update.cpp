@@ -21,7 +21,6 @@
 
 #include "trade_update.h"
 
-#include "common/socket.h"
 #include "common/utils.h"
 #include "common/vana_time.h"
 
@@ -49,16 +48,16 @@ CTradeUpdatePacket::CTradeUpdatePacket(CItem* PItem, uint8 SlotID)
             ref<uint8>(0x0F) = ((CItemUsable*)PItem)->getCurrentCharges();
         }
     }
-    if (PItem->isType(ITEM_LINKSHELL))
+    else if (PItem->isType(ITEM_LINKSHELL))
     {
         ref<uint32>(0x0E) = ((CItemLinkshell*)PItem)->GetLSID();
         ref<uint16>(0x14) = ((CItemLinkshell*)PItem)->GetLSRawColor();
         ref<uint8>(0x16)  = ((CItemLinkshell*)PItem)->GetLSType();
 
-        memcpy(data + (0x17), PItem->getSignature().c_str(), std::min<size_t>(PItem->getSignature().size(), 15));
+        std::memcpy(buffer_.data() + 0x17, PItem->getSignature().c_str(), std::min<size_t>(PItem->getSignature().size(), 15));
     }
     else
     {
-        memcpy(data + (0x1A), PItem->getSignature().c_str(), std::min<size_t>(PItem->getSignature().size(), 12));
+        std::memcpy(buffer_.data() + 0x0E, PItem->m_extra, std::min<size_t>(CItem::extra_size, 24));
     }
 }

@@ -6,6 +6,7 @@
 local ID = zones[xi.zone.MONASTIC_CAVERN]
 mixins = { require('scripts/mixins/job_special') }
 -----------------------------------
+---@type TMobEntity
 local entity = {}
 
 entity.onMobInitialize = function(mob)
@@ -33,7 +34,7 @@ end
 entity.onMobDespawn = function(mob)
     -- reset hqnm system back to the nm placeholder
     local nqId = mob:getID() - 1
-    SetServerVariable('[POP]Overlord_Bakgodek', os.time() + 259200) -- 3 days
+    SetServerVariable('[POP]Overlord_Bakgodek', GetSystemTime() + 259200) -- 3 days
     SetServerVariable('[PH]Overlord_Bakgodek', 0)
     DisallowRespawn(mob:getID(), true)
     DisallowRespawn(nqId, false)

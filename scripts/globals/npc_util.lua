@@ -16,6 +16,7 @@
     npcUtil.fishingAnimation(npc, phaseDuration, func)
 --]]
 
+---@class npcUtil
 npcUtil = {}
 
 --[[
@@ -33,6 +34,11 @@ npcUtil = {}
         if set a message will play if a entity spawns
 
 --]]
+---@param player CBaseEntity
+---@param qm CBaseEntity
+---@param mobId integer|integer[]
+---@param params table?
+---@return boolean
 function npcUtil.popFromQM(player, qm, mobId, params)
     local qmId = qm:getID()
 
@@ -50,19 +56,20 @@ function npcUtil.popFromQM(player, qm, mobId, params)
     end
 
     -- get list of mobs to pop
-    local mobs = {}
+    local mobIds = {}
     if type(mobId) == 'number' then
-        table.insert(mobs, mobId)
+        table.insert(mobIds, mobId)
     elseif type(mobId) == 'table' then
         for _, v in pairs(mobId) do
             if type(v) == 'number' then
-                table.insert(mobs, v)
+                table.insert(mobIds, v)
             end
         end
     end
 
-    -- make sure none are spawned
-    for k, v in pairs(mobs) do
+    -- make sure none are spawned, translate table from integers to CLuaBaseEntities
+    local mobs = {}
+    for k, v in pairs(mobIds) do
         local mob = GetMobByID(v)
         if mob == nil or mob:isSpawned() then
             return false
@@ -93,6 +100,16 @@ function npcUtil.popFromQM(player, qm, mobId, params)
         -- claim
         if params.claim then
             mob:updateClaim(player)
+        end
+
+        -- Distribute enmity
+        if type(params.enmityPlayerList) == 'table' then
+            -- Add 1 CE to ensure mobs go after spawner first in case params.claim == false
+            mob:addEnmity(player, 1, 0)
+
+            for _, member in ipairs(params.enmityPlayerList) do
+                mob:addEnmity(member, 1, 0)
+            end
         end
 
         -- look
@@ -137,16 +154,27 @@ end
     { x = x, y = y, z = z }
     { x = x, y = y, z = z, rot = r }
 --]]
+---@param x number
+---@param y number
+---@param z number
+---@param r integer?
+---@return function
+---@overload fun(posTable: { ['x']: number, ['y']: number, ['z']: number, ['rot']: integer? }): nil
 local function doMove(x, y, z, r)
     if not r then
         r = 0
     end
 
+    ---@param entity CBaseEntity
     return function(entity)
         entity:setPos(x, y, z, r)
     end
 end
 
+---@param npc CBaseEntity
+---@param point { ['x']: number, ['y']: number, ['z']: number, ['rot']: integer? }
+---@param delay integer?
+---@return nil
 function npcUtil.queueMove(npc, point, delay)
     if not delay then
         delay = 3000
@@ -158,12 +186,21 @@ function npcUtil.queueMove(npc, point, delay)
         point = { point.x, point.y, point.z }
     end
 
-    npc:queue(delay, doMove(unpack(point)))
+    local x, y, z, rot = unpack(point)
+
+    -- TODO: Current LLS version is treating all table entries as nil-able, where only rot is.  Ignore
+    -- until resolved.
+    ---@diagnostic disable-next-line: param-type-mismatch
+    npc:queue(delay, doMove(x, y, z, rot))
 end
 
 -- Picks a new position for an NPC and excluding the current position.
 -- INPUT: npc = npcID, position = 2D table with coords: index, { x, y, z }
 -- RETURN: table index
+---@param npcID integer
+---@param positionTable table
+---@param allowCurrentPosition boolean?
+---@return table
 function npcUtil.pickNewPosition(npcID, positionTable, allowCurrentPosition)
     local npc = GetNPCByID(npcID)
     local positionIndex  = 1 -- Default to position one in the table if it can't be found.
@@ -176,6 +213,7 @@ function npcUtil.pickNewPosition(npcID, positionTable, allowCurrentPosition)
         if not allowCurrentPosition then
             -- Finding by comparing the NPC's coords
             if
+                npc and
                 math.floor(v[1]) == math.floor(npc:getXPos()) and
                 math.floor(v[2]) == math.floor(npc:getYPos()) and
                 math.floor(v[3]) == math.floor(npc:getZPos())
@@ -203,10 +241,12 @@ end
     If not, do not give items, display a message to indicate this, and return false.
 
     Examples of valid items parameter:
-        640                 -- copper ore x1
-        { 640, 641 }        -- copper ore x1, tin ore x1
-        { { 640, 2 } }         -- copper ore x2
-        { { 640, 2 }, 641 }    -- copper ore x2, tin ore x1
+        npcUtil.giveItem(player, xi.item.CHUNK_OF_COPPER_ORE, 1)                                           -- copper ore x1
+        npcUtil.giveItem(player, { xi.item.CHUNK_OF_COPPER_ORE, 1 , xi.item.CHUNK_OF_TIN_ORE, 1 })         -- copper ore x1, tin ore x1
+        npcUtil.giveItem(player, { { xi.item.CHUNK_OF_COPPER_ORE, 2 } })                                   -- copper ore x2
+        npcUtil.giveItem(player, { { xi.item.CHUNK_OF_COPPER_ORE, 12 }, { xi.item.CHUNK_OF_TIN_ORE, 3 } }) -- copper ore x12 tin ore x3
+        npcUtil.giveItem(target, { { xi.item.CHUNK_OF_COPPER_ORE, math.random(3, 15) } })                  -- random 3-15 copper ores
+        enum can be found in scripts/enum/item.lua
 
     params (table) can contain the following parameters:
 
@@ -217,7 +257,20 @@ end
         "Try trading again after sorting your inventory"
         instead of
         "Come back again after sorting your inventory"
+    multiple (boolean default false)
+        if set, force message type as multiples version
+        eg. You obtain 1 chunk of rock salt!
 --]]
+
+---@class itemQuantityEntry : { [xi.item]: xi.item, [integer]: integer }
+
+---@class multipleItemList
+---@field [integer] { [integer]: xi.item, [integer]: integer }|xi.item
+
+---@param player CBaseEntity
+---@param items xi.item|itemQuantityEntry|multipleItemList
+---@param params { silent: boolean?, fromTrade: boolean?, multiple: boolean? }?
+---@return boolean
 function npcUtil.giveItem(player, items, params)
     params = params or {}
     local ID = zones[player:getZoneID()]
@@ -259,7 +312,10 @@ function npcUtil.giveItem(player, items, params)
     for _, v in pairs(givenItems) do
         if player:addItem(v[1], v[2], true) then
             if not params.silent and not messagedItems[v[1]] then
-                if v[2] > 1 then
+                if
+                    v[2] > 1 or
+                    params.multiple
+                then
                     player:messageSpecial(ID.text.ITEM_OBTAINED + 9, v[1], v[2])
                 else
                     player:messageSpecial(ID.text.ITEM_OBTAINED, v[1])
@@ -300,6 +356,10 @@ end
         instead of
         "Come back again after sorting your inventory"
 --]]
+---@param player CBaseEntity
+---@param items xi.item|itemQuantityEntry|multipleItemList
+---@param params { silent: boolean? }?
+---@return boolean
 function npcUtil.giveTempItem(player, items, params)
     params = params or {}
     local ID = zones[player:getZoneID()]
@@ -359,6 +419,10 @@ end
         gil, 500
         bayld, 1000
 --]]
+---@param player CBaseEntity
+---@param currency string
+---@param amount integer
+---@return boolean
 function npcUtil.giveCurrency(player, currency, amount)
     local ID = zones[player:getZoneID()]
 
@@ -410,20 +474,17 @@ end
         { xi.ki.PALBOROUGH_MINES_LOGS }
         { xi.ki.BLUE_ACIDITY_TESTER, xi.ki.RED_ACIDITY_TESTER }
 --]]
+---@param player CBaseEntity
+---@param keyitems xi.keyItem|{ [integer]: xi.keyItem }
+---@param msgId integer?
 function npcUtil.giveKeyItem(player, keyitems, msgId)
-    local ID = zones[player:getZoneID()]
-
-    -- create table of keyitems
-    local givenKeyItems = { keyitems }
-    if type(keyitems) == 'table' then
-        givenKeyItems = keyitems
-    elseif type(keyitems) ~= 'number' then
-        print(string.format('ERROR: invalid keyitems parameter given to npcUtil.giveKeyItem in zone %s.', player:getZoneName()))
-        return false
-    end
+    local ID            = zones[player:getZoneID()]
+    local givenKeyItems = type(keyitems) == 'table' and keyitems or { keyitems }
 
     -- give key items to player, with message
+
     for _, keyItemId in ipairs(givenKeyItems) do
+        ---@cast keyItemId xi.keyItem
         if not player:hasKeyItem(keyItemId) then
             player:addKeyItem(keyItemId)
 
@@ -449,16 +510,33 @@ end
             itemParams = {              -- see npcUtil.giveItem for formats
                 fromTrade = true,
             },
-            ki = xi.ki.ZERUHN_REPORT,           -- see npcUtil.giveKeyItem for formats
-            fameArea = xi.quest.fame_area.NORG, -- Required for Fame to be applied
+            keyItem = xi.ki.ZERUHN_REPORT,           -- see npcUtil.giveKeyItem for formats
+            fameArea = xi.fameArea.NORG, -- Required for Fame to be applied
             fame = 120,                         -- fame defaults to 30 if not set
             bayld = 500,
             gil = 200,
-            xp = 1000,
+            exp = 1000,
             title = xi.title.ENTRANCE_DENIED,
             var = { 'foo1', 'foo2' }      -- variable(s) to set to 0. string or table
         })
 --]]
+
+---@class rewardParam
+---@field item xi.item|itemQuantityEntry|multipleItemList?
+---@field itemParams { silent: boolean?, fromTrade: boolean?, multiple: boolean? }?
+---@field keyItem xi.keyItem|{ [integer]: xi.keyItem }?
+---@field ki xi.keyItem|{ [integer]: xi.keyItem }?
+---@field fame integer?
+---@field fameArea xi.fameArea?
+---@field bayld integer?
+---@field gil integer?
+---@field title xi.title?
+---@field var string|string[]?
+---@field exp integer?
+
+---@param player CBaseEntity
+---@param params rewardParam
+---@return boolean
 function npcUtil.giveReward(player, params)
     params = params or {}
 
@@ -473,9 +551,7 @@ function npcUtil.giveReward(player, params)
     end
 
     -- key item(s), fame, gil, bayld, xp, and title
-    if params['ki'] ~= nil then
-        npcUtil.giveKeyItem(player, params['ki'])
-    elseif params['keyItem'] ~= nil then
+    if params['keyItem'] ~= nil then
         npcUtil.giveKeyItem(player, params['keyItem'])
     end
 
@@ -501,8 +577,8 @@ function npcUtil.giveReward(player, params)
         player:messageSpecial(ID.text.BAYLD_OBTAINED, params['bayld'] * xi.settings.main.BAYLD_RATE)
     end
 
-    if params['xp'] ~= nil and type(params['xp']) == 'number' then
-        player:addExp(params['xp'] * xi.settings.main.EXP_RATE)
+    if params['exp'] ~= nil and type(params['exp']) == 'number' then
+        player:addExp(params['exp'] * xi.settings.main.EXP_RATE)
     end
 
     if params['title'] ~= nil then
@@ -512,6 +588,7 @@ function npcUtil.giveReward(player, params)
     if params['var'] ~= nil then
         local playerVarsToZero = {}
         if type(params['var']) == 'table' then
+            ---@cast params['var'] string[]
             playerVarsToZero = params['var']
         elseif type(params['var']) == 'string' then
             table.insert(playerVarsToZero, params['var'])
@@ -531,21 +608,27 @@ end
     Otherwise, return true.
 
     Example of usage with params (all params are optional):
-        npcUtil.completeQuest(player, xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.ROSEL_THE_ARMORER, {
+        npcUtil.completeQuest(player, xi.questLog.SANDORIA, xi.quest.id.sandoria.ROSEL_THE_ARMORER, {
             item = { { 640, 2 }, 641 },   -- see npcUtil.giveItem for formats
             itemParams = {              -- see npcUtil.giveItem for formats
                 fromTrade = true,
             },
-            ki = xi.ki.ZERUHN_REPORT,           -- see npcUtil.giveKeyItem for formats
-            fameArea = xi.quest.fame_area.NORG, -- Required for Fame to be applied
+            keyItem = xi.ki.ZERUHN_REPORT,           -- see npcUtil.giveKeyItem for formats
+            fameArea = xi.fameArea.NORG, -- Required for Fame to be applied
             fame = 120,                         -- fame defaults to 30 if not set
             bayld = 500,
             gil = 200,
-            xp = 1000,
+            exp = 1000,
             title = xi.title.ENTRANCE_DENIED,
             var = { 'foo1', 'foo2' }      -- variable(s) to set to 0. string or table
         })
 --]]
+
+---@param player CBaseEntity
+---@param area xi.questLog
+---@param quest integer
+---@param params rewardParam
+---@return boolean
 function npcUtil.completeQuest(player, area, quest, params)
     params = params or {}
 
@@ -560,9 +643,7 @@ function npcUtil.completeQuest(player, area, quest, params)
     end
 
     -- key item(s), fame, gil, bayld, xp, and title
-    if params['ki'] ~= nil then
-        npcUtil.giveKeyItem(player, params['ki'])
-    elseif params['keyItem'] ~= nil then
+    if params['keyItem'] ~= nil then
         npcUtil.giveKeyItem(player, params['keyItem'])
     end
 
@@ -586,12 +667,8 @@ function npcUtil.completeQuest(player, area, quest, params)
         player:messageSpecial(ID.text.BAYLD_OBTAINED, params['bayld'] * xi.settings.main.BAYLD_RATE)
     end
 
-    -- TODO: Find a more elegant way to handle this, but allow for xp vs exp keys.  This should
-    -- be one or the other, not both.
     if params['exp'] ~= nil and type(params['exp']) == 'number' then
         player:addExp(params['exp'] * xi.settings.main.EXP_RATE)
-    elseif params['xp'] ~= nil and type(params['xp']) == 'number' then
-        player:addExp(params['xp'] * xi.settings.main.EXP_RATE)
     end
 
     if params['title'] ~= nil then
@@ -601,12 +678,13 @@ function npcUtil.completeQuest(player, area, quest, params)
     if params['var'] ~= nil then
         local playerVarsToZero = {}
         if type(params['var']) == 'table' then
+            ---@cast params['var'] string[]
             playerVarsToZero = params['var']
         elseif type(params['var']) == 'string' then
             table.insert(playerVarsToZero, params['var'])
         end
 
-        for _, v in pairs(playerVarsToZero) do
+        for _, v in ipairs(playerVarsToZero) do
             player:setCharVar(v, 0)
         end
     end
@@ -634,15 +712,15 @@ end
     Otherwise, return true.
 
     Example of usage with params (all params are optional):
-        npcUtil.completeMission(player, xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.ROSEL_THE_ARMORER, {
+        npcUtil.completeMission(player, xi.questLog.SANDORIA, xi.quest.id.sandoria.ROSEL_THE_ARMORER, {
             item = { { 640, 2 }, 641 },   -- see npcUtil.giveItem for formats
             itemParams = {              -- see npcUtil.giveItem for formats
                 fromTrade = true,
             },
-            ki = xi.ki.ZERUHN_REPORT,   -- see npcUtil.giveKeyItem for formats
+            keyItem = xi.ki.ZERUHN_REPORT,   -- see npcUtil.giveKeyItem for formats
             bayld = 500,
-            gil = 200,
-            xp = 1000,
+            gil   = 200,
+            exp   = 1000,
             title = xi.title.ENTRANCE_DENIED,
         })
 --]]
@@ -660,9 +738,7 @@ function npcUtil.completeMission(player, logId, missionId, params)
     end
 
     -- key item(s), fame, gil, bayld, xp, and title
-    if params['ki'] ~= nil then
-        npcUtil.giveKeyItem(player, params['ki'])
-    elseif params['keyItem'] ~= nil then
+    if params['keyItem'] ~= nil then
         npcUtil.giveKeyItem(player, params['keyItem'])
     end
 
@@ -676,12 +752,8 @@ function npcUtil.completeMission(player, logId, missionId, params)
         player:messageSpecial(ID.text.BAYLD_OBTAINED, params['bayld'] * xi.settings.main.BAYLD_RATE)
     end
 
-    -- TODO: Find a more elegant way to handle this, but allow for xp vs exp keys.  This should
-    -- be one or the other, not both.
     if params['exp'] ~= nil and type(params['exp']) == 'number' then
         player:addExp(params['exp'] * xi.settings.main.EXP_RATE)
-    elseif params['xp'] ~= nil and type(params['xp']) == 'number' then
-        player:addExp(params['xp'] * xi.settings.main.EXP_RATE)
     end
 
     if params['title'] ~= nil then
@@ -860,12 +932,16 @@ end
 
 function npcUtil.UpdateNPCSpawnPoint(id, minTime, maxTime, posTable, serverVar)
     local npc = GetNPCByID(id)
+    if not npc then
+        return
+    end
+
     local respawnTime = math.random(minTime, maxTime)
     local newPosition = npcUtil.pickNewPosition(npc:getID(), posTable, true)
     serverVar = serverVar or nil -- serverVar is optional
 
     if serverVar then
-        if GetServerVariable(serverVar) <= os.time() then
+        if GetServerVariable(serverVar) <= GetSystemTime() then
             npc:hideNPC(1) -- hide so the NPC is not 'moving' through the zone
             npc:setPos(newPosition.x, newPosition.y, newPosition.z)
         end

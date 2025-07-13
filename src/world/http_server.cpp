@@ -1,29 +1,30 @@
-/*
+﻿/*
 ===========================================================================
 
-Copyright (c) 2022 LandSandBoat Dev Teams
+  Copyright (c) 2022 LandSandBoat Dev Teams
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see http://www.gnu.org/licenses/
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see http://www.gnu.org/licenses/
 
 ===========================================================================
 */
 
 #include "http_server.h"
 
+#include "common/async.h"
+#include "common/database.h"
 #include "common/logging.h"
 #include "common/settings.h"
-#include "common/sql.h"
 #include "common/utils.h"
 
 #include <unordered_set>
@@ -32,13 +33,12 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 using json = nlohmann::json;
 
 HTTPServer::HTTPServer()
+: m_apiDataCache(APIDataCache{})
 {
     if (!settings::get<bool>("network.ENABLE_HTTP"))
     {
         return;
     }
-
-    ts = std::make_unique<ts::task_system>(1);
 
     // NOTE: Everything registered in here happens off the main thread, so lock any global resources
     //     : you might be using.
@@ -48,8 +48,10 @@ HTTPServer::HTTPServer()
     auto host = settings::get<std::string>("network.HTTP_HOST");
     auto port = settings::get<uint16>("network.HTTP_PORT");
 
+    ShowInfoFmt("Starting HTTP Server on http://{}:{}/api", host, port);
+
     // clang-format off
-    ts->schedule([this, host, port]()
+    Async::getInstance()->submit([this, host, port]()
     {
         m_httpServer.Get("/api", [&](httplib::Request const& req, httplib::Response& res)
         {
@@ -59,20 +61,31 @@ HTTPServer::HTTPServer()
         m_httpServer.Get("/api/sessions", [&](httplib::Request const& req, httplib::Response& res)
         {
             LockingUpdate();
+            m_apiDataCache.read([&](const auto& apiDataCache)
+            {
+                json j = apiDataCache.activeSessionCount;
+                res.set_content(j.dump(), "application/json");
+            });
+        });
 
-            std::unique_lock<std::mutex> lock(m_updateBottleneck);
-            json j;
-            j = m_apiDataCache.activeSessionCount;
-            res.set_content(j.dump(), "application/json");
+        m_httpServer.Get("/api/ips", [&](httplib::Request const& req, httplib::Response& res)
+        {
+            LockingUpdate();
+            m_apiDataCache.read([&](const auto& apiDataCache)
+            {
+                json j = apiDataCache.activeUniqueIPCount;
+                res.set_content(j.dump(), "application/json");
+            });
         });
 
         m_httpServer.Get("/api/zones", [&](httplib::Request const& req, httplib::Response& res)
         {
             LockingUpdate();
-
-            std::unique_lock<std::mutex> lock(m_updateBottleneck);
-            json j = m_apiDataCache.zonePlayerCounts;
-            res.set_content(j.dump(), "application/json");
+            m_apiDataCache.read([&](const auto& apiDataCache)
+            {
+                json j = apiDataCache.zonePlayerCounts;
+                res.set_content(j.dump(), "application/json");
+            });
         });
 
         m_httpServer.Get(R"(/api/zones/(\d+))", [&](httplib::Request const& req, httplib::Response& res)
@@ -82,10 +95,11 @@ HTTPServer::HTTPServer()
             if (zoneId && zoneId < ZONEID::MAX_ZONEID)
             {
                 LockingUpdate();
-
-                std::unique_lock<std::mutex> lock(m_updateBottleneck);
-                json j = m_apiDataCache.zonePlayerCounts[zoneId];
-                res.set_content(j.dump(), "application/json");
+                m_apiDataCache.read([&](const auto& apiDataCache)
+                {
+                    json j = apiDataCache.zonePlayerCounts[zoneId];
+                    res.set_content(j.dump(), "application/json");
+                });
             }
             else
             {
@@ -141,7 +155,7 @@ HTTPServer::HTTPServer()
         m_httpServer.set_error_handler([](httplib::Request const& /*req*/, httplib::Response& res)
         {
             auto str = fmt::format("<p>Error Status: <span style='color:red;'>{} ({})</span></p>",
-                res.status, httplib::detail::status_message(res.status));
+                res.status, httplib::status_message(res.status));
 
             for (auto const& [key, val] : res.headers)
             {
@@ -156,17 +170,16 @@ HTTPServer::HTTPServer()
             // https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
             if (res.status >= 500)
             {
-                ShowError(fmt::format("Server Error: {} ({})", res.status, httplib::detail::status_message(res.status)));
+                ShowErrorFmt("Server Error: {} ({})", res.status, httplib::status_message(res.status));
                 return;
             }
             else if (res.status >= 400)
             {
-                ShowError(fmt::format("Client Error: {} ({})", res.status, httplib::detail::status_message(res.status)));
+                ShowErrorFmt("Client Error: {} ({})", res.status, httplib::status_message(res.status));
                 return;
             }
         });
 
-        ShowInfo(fmt::format("Starting HTTP Server on http://{}:{}/api", host, port));
         m_httpServer.listen(host, port);
     });
     // clang-format on
@@ -179,45 +192,55 @@ HTTPServer::~HTTPServer()
 
 void HTTPServer::LockingUpdate()
 {
-    std::unique_lock<std::mutex> lock(m_updateBottleneck);
-
-    auto now = server_clock::now();
-    if (now > (m_lastUpdate.load() + 60s))
+    auto now = timer::now();
+    if (now < (m_lastUpdate.load() + 60s))
     {
-        ShowInfo("API data is stale. Updating...");
+        return;
+    }
 
-        auto sql  = std::make_unique<SqlConnection>();
-        auto data = APIDataCache{};
+    // clang-format off
+    m_apiDataCache.write([&](auto& apiDataCache)
+    {
+        ShowInfoFmt("API data is stale. Updating...");
 
         // Total active sessions
         {
-            auto ret = sql->Query("SELECT COUNT(*) FROM accounts_sessions;");
-            if (ret != SQL_ERROR && sql->NumRows() && sql->NextRow() == SQL_SUCCESS)
+            auto rset = db::preparedStmt("SELECT COUNT(*) AS `count` FROM accounts_sessions");
+            if (rset && rset->next())
             {
-                data.activeSessionCount = sql->GetUIntData(0);
+                apiDataCache.activeSessionCount = rset->get<uint32>("count");
+            }
+        }
+
+        // Total active unique IPs
+        {
+            auto rset = db::preparedStmt("SELECT COUNT(DISTINCT client_addr) AS `count` FROM accounts_sessions");
+            if (rset && rset->next())
+            {
+                apiDataCache.activeUniqueIPCount = rset->get<uint32>("count");
             }
         }
 
         // Chars per zone
         {
-            auto ret = sql->Query("SELECT chars.pos_zone, COUNT(*) AS `count` "
-                                  "FROM chars "
-                                  "LEFT JOIN accounts_sessions "
-                                  "ON chars.charid = accounts_sessions.charid "
-                                  "GROUP BY pos_zone;");
-            if (ret != SQL_ERROR && sql->NumRows())
+            auto rset = db::preparedStmt("SELECT chars.pos_zone, COUNT(*) AS `count` "
+                                "FROM chars "
+                                "INNER JOIN accounts_sessions "
+                                "ON chars.charid = accounts_sessions.charid "
+                                "GROUP BY pos_zone");
+            if (rset && rset->rowsCount())
             {
-                while (sql->NextRow() == SQL_SUCCESS)
+                while (rset->next())
                 {
-                    auto zoneId = sql->GetUIntData(0);
-                    auto count  = sql->GetUIntData(1);
+                    auto zoneId = rset->get<uint16>("pos_zone");
+                    auto count  = rset->get<uint32>("count");
 
-                    data.zonePlayerCounts[zoneId] = count;
+                    apiDataCache.zonePlayerCounts[zoneId] = count;
                 }
             }
         }
 
-        m_apiDataCache = data;
         m_lastUpdate.store(now);
-    }
+    });
+    // clang-format on
 }

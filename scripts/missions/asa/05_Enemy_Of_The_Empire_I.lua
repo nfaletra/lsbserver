@@ -12,7 +12,7 @@ local mission = Mission:new(xi.mission.log_id.ASA, xi.mission.id.asa.ENEMY_OF_TH
 
 mission.reward =
 {
-    ki = xi.ki.BLACK_BOOK,
+    keyItem = xi.ki.BLACK_BOOK,
     nextMission = { xi.mission.log_id.ASA, xi.mission.id.asa.ENEMY_OF_THE_EMPIRE_II },
 }
 
@@ -151,7 +151,7 @@ mission.sections =
                     local mobOne = mission:getVar(player, 'MobOne')
                     local mobTwo = mission:getVar(player, 'MobTwo')
                     local mobThree = mission:getVar(player, 'MobThree')
-                    local pickupReady = mission:getVar(player, 'Soulplate') < os.time()
+                    local pickupReady = mission:getVar(player, 'Soulplate') < GetSystemTime()
                     local platesTraded = mission:getVar(player, 'Plates')
 
                     if option == 6 then

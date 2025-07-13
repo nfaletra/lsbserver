@@ -19,8 +19,6 @@
 ===========================================================================
 */
 
-#include "common/socket.h"
-
 #include <cstring>
 
 #include "fishing.h"
@@ -34,7 +32,7 @@
         0x4b, 0x00, 0x00, 0x00, 0x97, 0x00, 0x00, 0x00
     };
 
-    memcpy(data+4, &packet, 20);
+    std::memcpy(buffer_.data()+4, &packet, 20);
 
     ref<uint16>(data, (0x04)) = stamina;
     ref<uint8>(data, (0x06)) = id3;

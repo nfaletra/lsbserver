@@ -27,8 +27,8 @@ CPetSkill::CPetSkill(uint16 id)
 , m_AnimID(0)
 , m_Aoe(0)
 , m_Distance(0)
-, m_AnimationTime(0)
-, m_ActivationTime(0)
+, m_AnimationTime(0s)
+, m_ActivationTime(0s)
 , m_ValidTarget(0)
 , m_Message(0)
 , m_Flag(0)
@@ -41,12 +41,13 @@ CPetSkill::CPetSkill(uint16 id)
 , m_TP(0)
 , m_HPP(0)
 , m_TotalTargets(1)
+, m_PrimaryTargetID(0)
 {
 }
 
 bool CPetSkill::hasMissMsg() const
 {
-    return m_Message == 158 || m_Message == 188 || m_Message == 31 || m_Message == 30;
+    return m_Message == 324 || m_Message == 158 || m_Message == 188 || m_Message == 31 || m_Message == 30;
 }
 
 bool CPetSkill::isAoE() const
@@ -107,6 +108,11 @@ void CPetSkill::setTotalTargets(uint16 targets)
     m_TotalTargets = targets;
 }
 
+void CPetSkill::setPrimaryTargetID(uint32 targid)
+{
+    m_PrimaryTargetID = targid;
+}
+
 void CPetSkill::setAnimationID(uint16 animID)
 {
     m_AnimID = animID;
@@ -148,12 +154,12 @@ void CPetSkill::setHPP(uint8 hpp)
     m_HPP = hpp;
 }
 
-void CPetSkill::setAnimationTime(uint16 AnimationTime)
+void CPetSkill::setAnimationTime(timer::duration AnimationTime)
 {
     m_AnimationTime = AnimationTime;
 }
 
-void CPetSkill::setActivationTime(uint16 ActivationTime)
+void CPetSkill::setActivationTime(timer::duration ActivationTime)
 {
     m_ActivationTime = ActivationTime;
 }
@@ -187,6 +193,11 @@ uint8 CPetSkill::getHPP() const
 uint16 CPetSkill::getTotalTargets() const
 {
     return m_TotalTargets;
+}
+
+uint32 CPetSkill::getPrimaryTargetID() const
+{
+    return m_PrimaryTargetID;
 }
 
 uint16 CPetSkill::getMsg() const
@@ -303,12 +314,12 @@ uint16 CPetSkill::getValidTargets() const
     return m_ValidTarget;
 }
 
-uint16 CPetSkill::getAnimationTime() const
+timer::duration CPetSkill::getAnimationTime() const
 {
     return m_AnimationTime;
 }
 
-uint16 CPetSkill::getActivationTime() const
+timer::duration CPetSkill::getActivationTime() const
 {
     return m_ActivationTime;
 }

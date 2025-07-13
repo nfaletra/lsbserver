@@ -1,43 +1,39 @@
 # add_subdirectory(lua) # Handled globally
-# add_subdirectory(mysql) # Handled globally
+# add_subdirectory(mariadb) # Handled globally
+# add_subdirectory(mariadbcpp) # Handled globally
 # add_subdirectory(zmq) # Handled globally
 # add_subdirectory(openssl) # Handled globally
 add_subdirectory(concurrentqueue)
 add_subdirectory(sol)
 
-option(TRACY_ENABLE "Enable Tracy profiling." OFF)
-
-# Also handle close flags:
-if (ENABLE_TRACY OR TRACY_ENABLED OR TRACY)
-    set(TRACY_ENABLE ON)
-endif()
-
-message(STATUS "TRACY_ENABLE: ${TRACY_ENABLE}")
-
 # CPM Modules
 if(TRACY_ENABLE)
     # Tracy version tag, without the leading 'v'
-    set(TRACY_VERSION 0.10)
+    set(TRACY_VERSION 0.11.1)
 
     # Download client library
     CPMAddPackage(
-        NAME tracy
+        NAME TracyClient
         GITHUB_REPOSITORY wolfpld/tracy
         GIT_TAG v${TRACY_VERSION}
         OPTIONS
             "TRACY_ENABLE ON"
             "TRACY_ON_DEMAND ON"
-            "TRACY_NO_EXIT ON"
             "TRACY_NO_BROADCAST ON"
-            "TRACY_NO_SYSTEM_TRACING ON"
-            "TRACY_TIMER_QPC ON"
+            "TRACY_NO_CONTEXT_SWITCH ON"
+            "TRACY_NO_EXIT ON"
+            "TRACY_NO_VSYNC_CAPTURE ON"
+            "TRACY_NO_FRAME_IMAGE ON"
+            # "TRACY_NO_SYSTEM_TRACING ON" # This is incredibly heavy, add this line back if you need to speed up profiling
+            # "TRACY_TIMER_FALLBACK OFF" # Maybe useful to set ON for Linux VMs?
+            "TRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT ON"
     )
 
     # Download Win32 server executables
-    if (MSVC)
+    if(MSVC)
         message(STATUS "Downloading Tracy client")
         file(DOWNLOAD
-            https://github.com/wolfpld/tracy/releases/download/v${TRACY_VERSION}/Tracy-${TRACY_VERSION}.7z
+            https://github.com/wolfpld/tracy/releases/download/v${TRACY_VERSION}/windows-${TRACY_VERSION}.zip
             ${CMAKE_SOURCE_DIR}/tracy.tar.gz
             TIMEOUT 60
         )
@@ -68,7 +64,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME spdlog
     GITHUB_REPOSITORY gabime/spdlog
-    GIT_TAG v1.12.0
+    GIT_TAG v1.15.0
     OPTIONS
         "SPDLOG_ENABLE_PCH ON"
         "SPDLOG_FMT_EXTERNAL ON"
@@ -77,40 +73,34 @@ CPMAddPackage(
 CPMAddPackage(
     NAME recastnavigation
     GITHUB_REPOSITORY recastnavigation/recastnavigation
-    GIT_TAG cd898904b72a300011fbb24d578620bafa08ef2c
+    GIT_TAG bd98d84c274ee06842bf51a4088ca82ac71f8c2d
     OPTIONS
+        # TODO: Remove this once recast is updated to use CMake 3.5+, it's currently set to what we use in the root CMakeLists.txt
+        "CMAKE_POLICY_VERSION_MINIMUM 3.20"
         "RECASTNAVIGATION_DEMO OFF"
         "RECASTNAVIGATION_TESTS OFF"
         "RECASTNAVIGATION_EXAMPLES OFF"
+        "RECASTNAVIGATION_DT_POLYREF64 OFF"
+        "RECASTNAVIGATION_DT_VIRTUAL_QUERYFILTER OFF"
+        "RECASTNAVIGATION_ENABLE_ASSERTS OFF"
 ) # defines: RecastNavigation::Recast, RecastNavigation::Detour
 
 CPMAddPackage(
     NAME fast_obj
     GITHUB_REPOSITORY thisistherk/fast_obj
-    GIT_TAG 85778da5fc320b7e52885f8e869edc079695cc79
+    GIT_TAG 8145eb0a942784e5491a2e6b50008ce0fe3aa203
 ) # defines: fast_obj
 
 CPMAddPackage(
     NAME argparse
     GITHUB_REPOSITORY p-ranav/argparse
-    GIT_TAG f901d9edb47d45a287ca44d5bab48540c1fcdcce
+    GIT_TAG d924b84eba1f0f0adf38b20b7b4829f6f65b6570
 ) # defines: argparse
-
-CPMAddPackage(
-    NAME task_system
-    GITHUB_REPOSITORY p-ranav/task_system
-    GIT_TAG 241acb039152b646589fcbbcfb4d8d8e5bddc815
-) # defines: task_system
-
-if(task_system_ADDED)
-    add_library(task_system INTERFACE)
-    target_include_directories(task_system SYSTEM INTERFACE ${task_system_SOURCE_DIR}/include/task_system/)
-endif()
 
 CPMAddPackage(
     NAME efsw
     GITHUB_REPOSITORY SpartanJ/efsw
-    GIT_TAG 74ca09bff89bc8de1f7b8bf3faaa6275ce23b4c5
+    GIT_TAG 62f785c56b7a34f035193d4cb831921347b586b8 # 1.4.1
     OPTIONS
         "VERBOSE OFF"
         "NO_ATOMICS OFF"
@@ -123,26 +113,29 @@ CPMAddPackage(
 CPMAddPackage(
     NAME jthread-lite
     GITHUB_REPOSITORY martinmoene/jthread-lite
-    GIT_TAG 5332bbd46dcba5f028a844795cc0931e9f2ffdf4
+    GIT_TAG fffbe32e4d95cd7a444f8aa74f01e0c975568649
 ) # defines: jthread-lite
 
 # TODO: std::expected lands in C++23. Remove this once all compilers for all platforms implement.
 CPMAddPackage(
     NAME expected-lite
     GITHUB_REPOSITORY martinmoene/expected-lite
-    GIT_TAG 45a54fac224e5aae5f8e70bb1c2423181ae554da
+    GIT_TAG 48e5e2294689eac07fc5ae6784355941e9add475
 ) # defines: expected-lite
 
 CPMAddPackage(
     NAME cpp-httplib
     GITHUB_REPOSITORY yhirose/cpp-httplib
-    GIT_TAG v0.11.3
+    GIT_TAG v0.18.3
+    OPTIONS
+        "HTTPLIB_REQUIRE_ZLIB OFF"
+        "HTTPLIB_USE_ZLIB_IF_AVAILABLE OFF"
 ) # defines: httplib::httplib
 
 CPMAddPackage(
     NAME json
     GITHUB_REPOSITORY nlohmann/json
-    GIT_TAG 254395e5f7731b5595e7c11ac4b929c923582114
+    GIT_TAG 9f60e855576bb1e95f39ab23b3821982cccb0bab
 ) # defines: nlohmann_json::nlohmann_json
 
 CPMAddPackage(
@@ -157,9 +150,9 @@ endif()
 
 CPMAddPackage(
     NAME asio
-    VERSION 1.28.0
+    VERSION 1.32.0
     GITHUB_REPOSITORY chriskohlhoff/asio
-    GIT_TAG asio-1-28-0 # asio uses non-standard version tag, we must specify GIT_TAG
+    GIT_TAG asio-1-32-0 # asio uses non-standard version tag, we must specify GIT_TAG
 ) #defines asio
 
 # ASIO doesn't use CMake, we have to configure it manually. Extra notes for using on Windows:
@@ -231,51 +224,100 @@ if(bcrypt_ADDED) # bcrypt's cmake isn't suitable for us
     )
 endif()
 
-set(EXTERNAL_LIBS
+CPMAddPackage(
+    NAME alpaca
+    GITHUB_REPOSITORY p-ranav/alpaca
+    GIT_TAG 83a592f0c3807500f1aaf3b07fd48105a01e2780
+) # defines: alpaca
+
+CPMAddPackage(
+    NAME magic_enum
+    GITHUB_REPOSITORY Neargye/magic_enum
+    GIT_TAG 1a1824df7ac798177a521eed952720681b0bf482
+) # defines: magic_enum
+
+set(SHARED_EXTERNAL_LIBS
     fmt::fmt
     spdlog
     concurrentqueue
     mariadbclient
-    RecastNavigation::Recast
-    RecastNavigation::Detour
-    fast_obj
+    mariadbcpp
     sol2_single
     argparse
-    task_system
     efsw
     jthread-lite
     expected-lite
-    httplib::httplib
-    nlohmann_json::nlohmann_json
     pcg-cpp
     asio
-    bcrypt
+    alpaca
+    magic_enum
 )
 
 if(WIN32)
     # add wepoll for epoll support on windows
     add_subdirectory(wepoll)
 
-    list(APPEND EXTERNAL_LIBS
+    list(APPEND SHARED_EXTERNAL_LIBS
         wepoll
     )
 
 # backwards needs these to add to linker
 elseif(APPLE)
     # MacOS has bfd built in clang
-    list(APPEND EXTERNAL_LIBS
+    list(APPEND SHARED_EXTERNAL_LIBS
         dl
     )
 elseif(UNIX)
     # Linux needs bfd as it's not native like MacOS
-    list(APPEND EXTERNAL_LIBS
+    list(APPEND SHARED_EXTERNAL_LIBS
         bfd
         dl
     )
 endif()
 
-# copy external libs to parent scope
-set(EXTERNAL_LIBS
-    ${EXTERNAL_LIBS}
+set(CONNECT_ONLY_EXTERNAL_LIBS
+    bcrypt
+)
+
+set(MAP_ONLY_EXTERNAL_LIBS
+    RecastNavigation::Recast
+    RecastNavigation::Detour
+    fast_obj
+)
+
+set(SEARCH_ONLY_EXTERNAL_LIBS
+)
+
+set(WORLD_ONLY_EXTERNAL_LIBS
+    httplib::httplib
+    nlohmann_json::nlohmann_json
+)
+
+#
+# copy external lib lists to parent scope
+#
+
+set(SHARED_EXTERNAL_LIBS
+    ${SHARED_EXTERNAL_LIBS}
+    PARENT_SCOPE
+)
+
+set(CONNECT_ONLY_EXTERNAL_LIBS
+    ${CONNECT_ONLY_EXTERNAL_LIBS}
+    PARENT_SCOPE
+)
+
+set(MAP_ONLY_EXTERNAL_LIBS
+    ${MAP_ONLY_EXTERNAL_LIBS}
+    PARENT_SCOPE
+)
+
+set(SEARCH_ONLY_EXTERNAL_LIBS
+    ${SEARCH_ONLY_EXTERNAL_LIBS}
+    PARENT_SCOPE
+)
+
+set(WORLD_ONLY_EXTERNAL_LIBS
+    ${WORLD_ONLY_EXTERNAL_LIBS}
     PARENT_SCOPE
 )

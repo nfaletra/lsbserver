@@ -23,7 +23,7 @@
 #define _STATUSEFFECTCONTAINER_H
 
 #include "common/cbasetypes.h"
-#include "common/taskmgr.h"
+#include "common/task_manager.h"
 
 #include <set>
 
@@ -37,6 +37,12 @@
 
 class CBattleEntity;
 
+enum class EffectNotice : uint8
+{
+    ShowMessage = 0, // Display the "effect wears off" or "gains effect" message to the player
+    Silent      = 1, // Suppress the message entirely
+};
+
 class CStatusEffectContainer
 {
 public:
@@ -45,12 +51,13 @@ public:
 
     bool ApplyBardEffect(CStatusEffect* PStatusEffect, uint8 maxSongs);
     bool CanGainStatusEffect(CStatusEffect* PStatusEffect); // returns true if the status effect will take effect
-    bool AddStatusEffect(CStatusEffect* StatusEffect, bool silent = false);
+    bool AddStatusEffect(CStatusEffect* StatusEffect, EffectNotice = EffectNotice::ShowMessage);
     bool DelStatusEffect(EFFECT StatusID);
     bool DelStatusEffectSilent(EFFECT StatusID);
     bool DelStatusEffect(EFFECT StatusID, uint16 SubID);
-    void DelStatusEffectsByFlag(uint32 flag, bool silent = false); // Remove all the status effects with the specified type
-    void DelStatusEffectsByIcon(uint16 IconID);                    // Remove all effects with the specified icon
+    bool DelStatusEffectBySource(EFFECT StatusID, EffectSourceType EffectSourceType, uint16 SourceTypeParam);
+    void DelStatusEffectsByFlag(uint32 flag, EffectNotice notice = EffectNotice::ShowMessage); // Remove all the status effects with the specified type
+    void DelStatusEffectsByIcon(uint16 BuffNo);                                                // Remove all effects with the specified icon
     void DelStatusEffectsByType(uint16 Type);
     bool DelStatusEffectByTier(EFFECT StatusID, uint16 power);
     void KillAllStatusEffect();
@@ -61,15 +68,16 @@ public:
     bool HasStatusEffect(std::initializer_list<EFFECT>);
     bool HasStatusEffectByFlag(uint32 flag);
 
-    EFFECT         EraseStatusEffect();                    // We delete the first negative effect
-    EFFECT         HealingWaltz();                         // dancers healing waltz
-    uint8          EraseAllStatusEffect();                 // erases all status effects
-    EFFECT         DispelStatusEffect(EFFECTFLAG flag);    // We delete the first positive effect
-    uint8          DispelAllStatusEffect(EFFECTFLAG flag); // dispels all status effects
-    CStatusEffect* StealStatusEffect(EFFECTFLAG flag);     // dispels one effect and returns it
+    EFFECT         EraseStatusEffect();                                     // We delete the first negative effect
+    EFFECT         HealingWaltz();                                          // dancers healing waltz
+    uint8          EraseAllStatusEffect();                                  // erases all status effects
+    EFFECT         DispelStatusEffect(EFFECTFLAG flag);                     // We delete the first positive effect
+    uint8          DispelAllStatusEffect(EFFECTFLAG flag);                  // dispels all status effects
+    CStatusEffect* StealStatusEffect(EFFECTFLAG flag, EffectNotice notice); // dispels one effect and returns it
 
     CStatusEffect* GetStatusEffect(EFFECT StatusID);
     CStatusEffect* GetStatusEffect(EFFECT StatusID, uint32 SubID);
+    CStatusEffect* GetStatusEffectBySource(EFFECT StatusID, EffectSourceType Sourcetype, uint16 SourceTypeParam);
 
     std::vector<EFFECT> GetStatusEffectsInIDRange(EFFECT start, EFFECT end);
 
@@ -80,15 +88,16 @@ public:
     void   RemoveAllStatusEffectsInIDRange(EFFECT start, EFFECT end);
 
     void UpdateStatusIcons(); // We recall the effects of the effects
-    void CheckEffectsExpiry(time_point tick);
-    void TickEffects(time_point tick);
-    void TickRegen(time_point tick);
+    void CheckEffectsExpiry(timer::time_point tick);
+    void TickEffects(timer::time_point tick);
+    void TickRegen(timer::time_point tick);
 
     void LoadStatusEffects();                    // We load the character effects
     void SaveStatusEffects(bool logout = false); // We keep the character effects
 
-    uint8 GetEffectsCount(EFFECT ID); // We get the number of effects with the specified ID
-    uint8 GetLowestFreeSlot();        // returns the lowest free slot for songs/rolls
+    uint8 GetEffectsCount(EFFECT ID);               // We get the number of effects with the specified ID
+    uint8 GetEffectsCountWithFlag(EFFECTFLAG flag); // We get the number of effects with the specified flag
+    uint8 GetLowestFreeSlot();                      // returns the lowest free slot for songs/rolls
 
     bool ApplyCorsairEffect(CStatusEffect* PStatusEffect, uint8 maxRolls, uint8 bustDuration);
     bool CheckForElevenRoll();
@@ -132,8 +141,7 @@ private:
     CBattleEntity* m_POwner = nullptr;
 
     // void ReplaceStatusEffect(EFFECT effect); //this needs to be implemented
-    void RemoveStatusEffect(uint32 id, bool silent = false);              // We remove the effect by its number in the container
-    void RemoveStatusEffect(CStatusEffect* PEffect, bool silent = false); // We remove the effect by its number in the container
+    void RemoveStatusEffect(CStatusEffect* PEffect, EffectNotice notice = EffectNotice::ShowMessage); // We remove the effect by its number in the container
     void DeleteStatusEffects();
     void SetEffectParams(CStatusEffect* StatusEffect); // We set the effect of the effect
     void HandleAura(CStatusEffect* PStatusEffect);

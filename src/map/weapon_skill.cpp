@@ -26,7 +26,7 @@ CWeaponSkill::CWeaponSkill(uint16 id)
 : m_ID(id)
 , m_TypeID(0)
 {
-    memset(m_Job, 0, sizeof(m_Job));
+    std::memset(m_Job, 0, sizeof(m_Job));
     m_Skilllevel          = 0;
     m_AnimationId         = 0;
     m_Element             = 0;
@@ -71,7 +71,7 @@ void CWeaponSkill::setUnlockId(uint8 id)
 
 void CWeaponSkill::setJob(int8* jobs)
 {
-    memcpy(&m_Job[1], jobs, 22);
+    std::memcpy(&m_Job[1], jobs, 22);
 }
 
 void CWeaponSkill::setSkillLevel(uint16 level)
@@ -114,7 +114,7 @@ void CWeaponSkill::setAnimationId(int8 id)
     m_AnimationId = id;
 }
 
-void CWeaponSkill::setAnimationTime(duration time)
+void CWeaponSkill::setAnimationTime(timer::duration time)
 {
     m_AnimationTime = time;
 }
@@ -169,7 +169,7 @@ uint8 CWeaponSkill::getAnimationId() const
     return m_AnimationId;
 }
 
-duration CWeaponSkill::getAnimationTime()
+timer::duration CWeaponSkill::getAnimationTime()
 {
     return m_AnimationTime;
 }

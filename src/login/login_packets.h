@@ -1,20 +1,20 @@
 ﻿/*
 ===========================================================================
 
-Copyright (c) 2023 LandSandBoat Dev Teams
+  Copyright (c) 2023 LandSandBoat Dev Teams
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see http://www.gnu.org/licenses/
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see http://www.gnu.org/licenses/
 
 ===========================================================================
 */
@@ -131,7 +131,9 @@ struct lpkt_chr_info_sub2
     uint16_t          ffxi_id_world;      // PS2: ffxi_id_world
     uint16_t          worldid;            // PS2: worldid
     uint16_t          status;             // PS2: status
-    uint8_t           renamef;            // PS2: renamef
+    uint8_t           renamef : 1;        // PS2: renamef
+    uint8_t           race_change : 1;    // PS2: (New; did not exist.)
+    uint8_t           unused : 6;         // PS2: (New; did not exist.)
     uint8_t           ffxi_id_world_tbl;  // PS2: (New; did not exist.)
     char              character_name[16]; // PS2: character_name
     char              world_name[16];     // PS2: world_name

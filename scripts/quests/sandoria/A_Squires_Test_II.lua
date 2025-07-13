@@ -9,12 +9,12 @@
 local ordellesCavesID = zones[xi.zone.ORDELLES_CAVES]
 -----------------------------------
 
-local quest = Quest:new(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.A_SQUIRES_TEST_II)
+local quest = Quest:new(xi.questLog.SANDORIA, xi.quest.id.sandoria.A_SQUIRES_TEST_II)
 
 quest.reward =
 {
     fame     = 30,
-    fameArea = xi.quest.fame_area.SANDORIA,
+    fameArea = xi.fameArea.SANDORIA,
     keyItem  = xi.ki.SQUIRE_CERTIFICATE,
     title    = xi.title.SPELUNKER,
 }
@@ -23,8 +23,8 @@ quest.sections =
 {
     {
         check = function(player, status, vars)
-            return status == QUEST_AVAILABLE and
-                player:hasCompletedQuest(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.A_SQUIRES_TEST)
+            return status == xi.questStatus.QUEST_AVAILABLE and
+                player:hasCompletedQuest(xi.questLog.SANDORIA, xi.quest.id.sandoria.A_SQUIRES_TEST)
         end,
 
         [xi.zone.SOUTHERN_SAN_DORIA] =
@@ -51,7 +51,7 @@ quest.sections =
 
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED
+            return status == xi.questStatus.QUEST_ACCEPTED
         end,
 
         [xi.zone.SOUTHERN_SAN_DORIA] =
@@ -101,7 +101,7 @@ quest.sections =
             {
                 onTrigger = function(player, npc)
                     if not player:hasKeyItem(xi.ki.STALACTITE_DEW) then
-                        quest:setVar(player, 'Timer', os.time() + 30)
+                        quest:setVar(player, 'Timer', GetSystemTime() + 30)
                     end
 
                     return quest:messageSpecial(ordellesCavesID.text.PLACE_HANDS_IN_POOL)
@@ -112,7 +112,7 @@ quest.sections =
             {
                 onTrigger = function(player, npc)
                     if not player:hasKeyItem(xi.ki.STALACTITE_DEW) then
-                        if os.time() <= quest:getVar(player, 'Timer') then
+                        if GetSystemTime() <= quest:getVar(player, 'Timer') then
                             return quest:keyItem(xi.ki.STALACTITE_DEW)
                         else
                             return quest:messageSpecial(ordellesCavesID.text.DEW_SLIPS_THROUGH_FINGERS)

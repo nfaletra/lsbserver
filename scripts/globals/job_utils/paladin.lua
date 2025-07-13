@@ -24,7 +24,7 @@ xi.job_utils.paladin.checkIntervene = function(player, target, ability)
     if player:getShieldSize() == 0 then
         return xi.msg.basic.REQUIRES_SHIELD, 0
     else
-        ability:setRecast(ability:getRecast() - player:getMod(xi.mod.ONE_HOUR_RECAST))
+        ability:setRecast(math.max(0, ability:getRecast() - player:getMod(xi.mod.ONE_HOUR_RECAST) * 60))
 
         return 0, 0
     end
@@ -34,7 +34,7 @@ xi.job_utils.paladin.checkInvincible = function(player, target, ability)
     local jpValue = player:getJobPointLevel(xi.jp.INVINCIBLE_EFFECT)
 
     ability:setVE(ability:getVE() + 100 * jpValue)
-    ability:setRecast(ability:getRecast() - player:getMod(xi.mod.ONE_HOUR_RECAST))
+    ability:setRecast(math.max(0, ability:getRecast() - player:getMod(xi.mod.ONE_HOUR_RECAST) * 60))
 
     return 0, 0
 end
@@ -108,6 +108,8 @@ xi.job_utils.paladin.useHolyCircle = function(player, target, ability)
     if player:getMainJob() ~= xi.job.PLD then
         power = 5
     end
+
+    power = power + player:getMod(xi.mod.HOLY_CIRCLE_POTENCY)
 
     target:addStatusEffect(xi.effect.HOLY_CIRCLE, power, 0, duration)
 end
@@ -202,7 +204,7 @@ xi.job_utils.paladin.useShieldBash = function(player, target, ability)
     -- Calculate stun proc chance
     chance = chance + (player:getMainLvl() - target:getMainLvl()) * 5
 
-    if math.random() * 100 < chance then
+    if math.random(1, 100) <= chance then
         target:addStatusEffect(xi.effect.STUN, 1, 0, 6)
     end
 

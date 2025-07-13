@@ -4,12 +4,13 @@
 local ID = zones[xi.zone.NORTHERN_SAN_DORIA]
 require('scripts/quests/flyers_for_regine')
 -----------------------------------
+---@type TZone
 local zoneObject = {}
 
 zoneObject.onInitialize = function(zone)
     xi.server.setExplorerMoogles(ID.npc.EXPLORER_MOOGLE)
 
-    zone:registerTriggerArea(1, -7, -3, 110, 7, -1, 155)
+    zone:registerCuboidTriggerArea(1, -7, -3, 110, 7, -1, 155)
     quests.ffr.initZone(zone) -- register trigger areas 2 through 6
 
     xi.events.harvestFestival.applyHalloweenNpcCostumes(zone:getID())
@@ -38,11 +39,11 @@ zoneObject.onZoneIn = function(player, prevZone)
 end
 
 zoneObject.onConquestUpdate = function(zone, updatetype, influence, owner, ranking, isConquestAlliance)
-    xi.conq.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
+    xi.conquest.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
 end
 
 zoneObject.onTriggerAreaEnter = function(player, triggerArea)
-    switch (triggerArea:GetTriggerAreaID()): caseof
+    switch (triggerArea:getTriggerAreaID()): caseof
     {
         [1] = function()  -- Chateau d'Oraguille access
             local pNation = player:getNation()
@@ -75,7 +76,7 @@ zoneObject.onEventFinish = function(player, csid, option, npc)
         player:setPos(0, 0, -13, 192, 233)
     elseif
         csid == 49 and
-        npcUtil.completeQuest(player, xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.PEACE_FOR_THE_SPIRIT, { item = 12513, fame = 60, title = xi.title.PARAGON_OF_RED_MAGE_EXCELLENCE })
+        npcUtil.completeQuest(player, xi.questLog.SANDORIA, xi.quest.id.sandoria.PEACE_FOR_THE_SPIRIT, { item = 12513, fame = 60, title = xi.title.PARAGON_OF_RED_MAGE_EXCELLENCE })
     then
         player:setCharVar('peaceForTheSpiritCS', 0)
     elseif csid == 16 then

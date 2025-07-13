@@ -1,12 +1,19 @@
 -----------------------------------
 -- Area: LaLoff Amphitheater
 --  Mob: Ark Angel EV
+-- TODO: Shield Bash every 10 seconds
 -----------------------------------
 mixins = { require('scripts/mixins/job_special') }
 -----------------------------------
+---@type TMobEntity
 local entity = {}
 
 entity.onMobInitialize = function(mob)
+    mob:addImmunity(xi.immunity.SILENCE)
+    mob:addImmunity(xi.immunity.PETRIFY)
+    mob:addImmunity(xi.immunity.LIGHT_SLEEP)
+    mob:addImmunity(xi.immunity.DARK_SLEEP)
+    mob:setMobMod(xi.mobMod.CAN_PARRY, 3)
     mob:addMod(xi.mod.REGAIN, 50)
 end
 
@@ -25,13 +32,10 @@ entity.onMobEngage = function(mob, target)
 
     for member = mobid-4, mobid + 3 do
         local m = GetMobByID(member)
-        if m:getCurrentAction() == xi.act.ROAMING then
+        if m and m:getCurrentAction() == xi.act.ROAMING then
             m:updateEnmity(target)
         end
     end
-end
-
-entity.onMobDeath = function(mob, player, optParams)
 end
 
 return entity

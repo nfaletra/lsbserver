@@ -2,6 +2,7 @@
 -- func: gotoid
 -- desc: Go to given mob or npc ID
 -----------------------------------
+---@type TCommand
 local commandObj = {}
 
 commandObj.cmdprops =
@@ -45,7 +46,7 @@ commandObj.onTrigger = function(player, target)
     end
 
     if not targ then
-        player:goToEntity(target)
+        player:gotoEntity(target)
     elseif pos0 then
         player:printToPlayer(string.format('%s (%i) has not been given coordinates.', targ:getName(), targ:getID()))
     else
@@ -57,9 +58,9 @@ commandObj.onTrigger = function(player, target)
 
         -- display message
         if isUp then
-            player:printToPlayer(string.format('Going to %s (%i).', targ:getName(), targ:getID()))
+            player:printToPlayer(string.format('Going to %s (%i) in %s.', targ:getName(), targ:getID(), targ:getZoneName()))
         else
-            player:printToPlayer(string.format('%s (%i) is not currently up. Going to last known coordinates.', targ:getName(), targ:getID()))
+            player:printToPlayer(string.format('%s (%i) is not currently up in %s. Going to last known coordinates.', targ:getName(), targ:getID(), targ:getZoneName()))
         end
 
         -- half a second later, go.  this delay gives time for previous message to appear

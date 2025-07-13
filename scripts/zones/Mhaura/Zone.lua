@@ -3,11 +3,12 @@
 -----------------------------------
 local ID = zones[xi.zone.MHAURA]
 -----------------------------------
+---@type TZone
 local zoneObject = {}
 
 zoneObject.onGameHour = function(zone)
     -- Script for Laughing Bison sign flip animations
-    local timer = 1152 - ((os.time() - 1009810802)%1152)
+    local timer = 1152 - ((GetSystemTime() - 1009810802)%1152)
 
     -- Next ferry is Al Zhabi for higher values.
     if timer >= 576 then
@@ -43,20 +44,11 @@ zoneObject.onZoneIn = function(player, prevZone)
         end
     end
 
-    if
-        player:getCurrentMission(xi.mission.log_id.COP) == xi.mission.id.cop.DAWN and
-        player:getCharVar('PromathiaStatus') == 3 and
-        player:getCharVar('Promathia_kill_day') < os.time() and
-        player:getCharVar('COP_shikarees_story') == 0
-    then
-        cs = 322
-    end
-
     return cs
 end
 
 zoneObject.onConquestUpdate = function(zone, updatetype, influence, owner, ranking, isConquestAlliance)
-    xi.conq.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
+    xi.conquest.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
 end
 
 zoneObject.onTransportEvent = function(player, transport)
@@ -93,8 +85,6 @@ zoneObject.onEventFinish = function(player, csid, option, npc)
         else
             player:setPos(8, -1, 5, 62, 249) -- Something went wrong, dump them on the dock for safety.
         end
-    elseif csid == 322 then
-        player:setCharVar('COP_shikarees_story', 1)
     end
 end
 

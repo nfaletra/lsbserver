@@ -136,31 +136,31 @@ xi.instance.lookup =
 
     [xi.zone.ZHAYOLM_REMNANTS] =
     {
-        -- Salvage
+        { 7300, { 407, 0, -6, 0, 0, 7 }, { 407, 4 }, { 411, 7 } }, -- Salvage I, Zhayolm Remnants
     },
 
     [xi.zone.ARRAPAGO_REMNANTS] =
     {
-        -- Salvage
+        { 7400, { 408, 0, -6, 0, 0, 8 }, { 408, 4 }, { 411, 8 } }, -- Salvage I, Arrapago Remnants
     },
 
     [xi.zone.BHAFLAU_REMNANTS] =
     {
-        -- Salvage
+        { 7500, { 409, 0, -6, 0, 0, 9 }, { 409, 4 }, { 411, 9 } }, -- Salvage I, Bhaflau Remnants
     },
 
     [xi.zone.SILVER_SEA_REMNANTS] =
     {
-        -- Salvage
+        { 7600, { 410, 0, -6, 0, 0, 10 }, { 410, 4 }, { 411, 10 } }, -- Salvage I, Silver Sea Remnants
     },
 
     [xi.zone.NYZUL_ISLE] =
     {
-        { 7700, { 405, 58,  -6, 0, 99, 5, 0 }, { 116, 1 }, { 411, 5 } }, -- Path of Darkness
-        { 7701, { 405, 59, -10, 0, 99, 5, 0 }, { 116, 1 }, { 411, 5 } }, -- Nashmeira's Plea
-        -- Waking the Colossus / Divine Interference
+        { 7700, { 405, 58,  -6, 0, 99, 5, 0 }, { 116, 1 }, { 411, 5 } },        -- Path of Darkness
+        { 7701, { 405, 59, -10, 0, 99, 5, 0 }, { 116, 1 }, { 411, 5 } },        -- Nashmeira's Plea
+        { 7702, { 405, 60, -34, 0, 99, 5, 1, 0, 14 }, { 116, 1 }, { 411, 5 } }, -- Waking the Colossus/Divine Interference
         -- Forging a New Myth
-        { 7704, { 405, 51,  -4, 0, 75, 5, 1 }, { 116, 2 }, { 411, 5 } }, -- Nyzul Isle Investigation
+        { 7704, { 405, 51,  -4, 0, 75, 5, 1 }, { 116, 2 }, { 411, 5 } },        -- Nyzul Isle Investigation
     },
 
     [xi.zone.EVERBLOOM_HOLLOW] =
@@ -293,6 +293,19 @@ xi.instance.lookup =
     },
 }
 
+local getInstanceName = function(player, instanceId)
+    return switch (instanceId) : caseof
+    {
+        [7702] = function()
+            if player:getQuestStatus(xi.questLog.AHT_URHGAN, xi.quest.id.ahtUrhgan.DIVINE_INTERFERENCE) >= xi.questStatus.QUEST_ACCEPTED then
+                return 1 -- Divine Interference
+            else
+                return 0 -- Waking the Colossus
+            end
+        end,
+    }
+end
+
 -- Party leader registering
 local checkRegistryReqs = function(player, instanceId)
     local instanceObj = GetCachedInstanceScript(instanceId)
@@ -352,6 +365,10 @@ xi.instance.onTrigger = function(player, npc, instanceZoneID)
 
     if hasValidEntry then
         player:setLocalVar('INSTANCE_ID', instanceId)
+        if instanceTriggerArgs[8] ~= nil then
+            instanceTriggerArgs[8] = getInstanceName(player, instanceId)
+        end
+
         player:startEvent(unpack(instanceTriggerArgs))
 
         return true
@@ -367,7 +384,10 @@ xi.instance.onEventUpdate = function(player, csid, option, npc)
 
     if party ~= nil then
         for _, v in pairs(party) do
-            if v:getID() ~= player:getID() then
+            if
+                v:getID() ~= player:getID() and
+                v:getZoneID() == player:getZoneID()
+            then
                 -- Check entry requirements for party
                 if not checkEntryReqs(v, instanceId) then
                     player:messageText(npc, ID.text.MEMBER_NO_REQS, false)
@@ -377,7 +397,7 @@ xi.instance.onEventUpdate = function(player, csid, option, npc)
                 end
 
                 -- Check everyone is in range
-                if v:getZoneID() == player:getZoneID() and v:checkDistance(player) > 50 then
+                if v:checkDistance(player) > 50 then
                     player:messageText(npc, ID.text.MEMBER_TOO_FAR, false)
                     player:instanceEntry(npc, 1)
 
@@ -392,10 +412,21 @@ xi.instance.onEventUpdate = function(player, csid, option, npc)
         player:setLocalVar('INSTANCE_REQUESTED', 1)
     end
 
-    return player:getInstance() ~= nil
+    if
+        player:getInstance() ~= nil or
+        (player:getLocalVar('INSTANCE_REQUESTED') > 0 and
+        player:getLocalVar('INSTANCE_REQUESTED') < 10)
+    then
+        -- return true so we don't immediately call the cancel event update (since instances don't immediately load), but
+        -- increment variable to eventually return false if instance fails to load and trigger onInstanceCreatedCallback
+        player:setLocalVar('INSTANCE_REQUESTED', player:getLocalVar('INSTANCE_REQUESTED') + 1)
+        return true
+    else
+        return false
+    end
 end
 
--- 'Default' behaviour. It's up to each instance whether or not they want to use this logic
+-- 'Default' behavior. It's up to each instance whether or not they want to use this logic
 xi.instance.onInstanceCreatedCallback = function(player, instance)
     local zoneLookup = xi.instance.lookup[instance:getZone():getID()]
     local instanceId = instance:getID()
@@ -414,19 +445,47 @@ xi.instance.onInstanceCreatedCallback = function(player, instance)
     -- If you're in the official entrance zone, try and playout the
     -- entrance animation. Otherwise: go straight to the instance
     if player:getZoneID() == instance:getEntranceZoneID() then
+        -- join initiating player as commander
+        player:setInstance(instance)
+
         -- This packet will trigger the end of the blocking
         -- cutscene and xi.instance.onEventFinish will handle
         -- the transportation
         for _, v in ipairs(player:getParty()) do
-            if v:getID() ~= player:getID() then
-                v:startEvent(unpack(lookupEntry[4]))
-            end
+            if v:getZoneID() == player:getZoneID() then
+                if v:getID() ~= player:getID() then
+                    -- player will be brought into instance either way
+                    -- this makes the animation trigger reliably
+                    v:release()
+                    v:startEvent(unpack(lookupEntry[4]))
 
-            v:setInstance(instance)
-            local npc = player:getEventTarget()
-            if npc ~= nil then
-                v:instanceEntry(npc, 4)
+                    v:setInstance(instance)
+                    local npc = player:getEventTarget()
+                    if npc ~= nil then
+                        v:instanceEntry(npc, 4)
+                    end
+                end
+
+                v:timer(35000, function(playerArg)
+                    -- failsafe to bring all players into instance
+                    -- if a player doesn't receive the event packet, the whole party will be stuck in blackscreen
+                    -- timer is destroyed if onEventFinish works properly and player gets zoned
+                    -- a properly-functioning event loop will take 20s to zoning into the instance
+                    -- this _should_ be completely unnecessary due to the looping logic with INSTANCE_REQUESTED, but just in case
+                    local instanceArg = playerArg:getInstance()
+                    if instanceArg then
+                        print(fmt('Player {} failed to cleanly transition into instance event, forcing entry via setPos.', playerArg:getName()))
+                        playerArg:setPos(0, 0, 0, 0, instanceArg:getZone():getID())
+                    end
+                end)
             end
+        end
+
+        -- finally, send commander in
+        player:startEvent(unpack(lookupEntry[4])) -- will fail if previous event is working as it should, otherwise catches secondary event to enter
+        local npc = player:getEventTarget()
+        if npc ~= nil then
+            player:instanceEntry(npc, 4)
         end
     else
         for _, v in ipairs(player:getParty()) do

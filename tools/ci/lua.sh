@@ -24,12 +24,14 @@ global_objects=(
     xi
     ai
     os
+    sleep
     _
     _G
 
     Module
     Override
     super
+    applyOverride
 
     common
     zones
@@ -44,6 +46,7 @@ global_objects=(
 
     set
     printf
+    fmt
     switch
     getVanaMidnight
     getMidnight
@@ -69,22 +72,16 @@ global_objects=(
     Limbus
     SeasonalEvent
 
-    QUEST_AVAILABLE
-    QUEST_ACCEPTED
-    QUEST_COMPLETED
-
-    onBattlefieldHandlerInitialise
+    onBattlefieldHandlerInitialize
     applyResistanceAddEffect
 
     addBonuses
     addBonusesAbility
-    applyResistance
     applyResistanceAbility
     applyResistanceEffect
     adjustForTarget
     calculateDuration
     calculateMagicDamage
-    canOverwrite
     doEnspell
     finalMagicAdjustments
     finalMagicNonSpellAdjustments
@@ -94,8 +91,6 @@ global_objects=(
     getCureFinal
     getBaseCureOld
     getElementalDamageReduction
-    getMagicHitRate
-    getMagicResist
     handleThrenody
     isValidHealTarget
 
@@ -103,6 +98,8 @@ global_objects=(
     BuildString
 
     GetFirstID
+
+    ReloadSynthRecipes
 )
 
 ignores=(

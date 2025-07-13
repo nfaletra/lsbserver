@@ -4,6 +4,7 @@
 -----------------------------------
 local ID = zones[xi.zone.BEARCLAW_PINNACLE]
 -----------------------------------
+---@type TMobEntity
 local entity = {}
 
 entity.onMobSpawn = function(mob)
@@ -13,7 +14,7 @@ end
 entity.onMobEngage = function(mob, target)
 end
 
-entity.onMobFight = function(mob, player, target)
+entity.onMobFight = function(mob, player)
     local changeTime = mob:getLocalVar('changeTime')
     local delay = mob:getLocalVar('delayed')
     local cd = mob:getLocalVar('cooldown')
@@ -29,7 +30,7 @@ entity.onMobFight = function(mob, player, target)
 
     -- handle salt cooldown
     if
-        cd < os.time() and
+        cd < GetSystemTime() and
         salty == 1
     then
         player:messageText(player, ID.text.SHOOK_SALT)
@@ -38,7 +39,7 @@ entity.onMobFight = function(mob, player, target)
 
     -- big
     if
-        delay < os.time() and
+        delay < GetSystemTime() and
         mob:getAnimationSub() == 4 and
         mob:getBattleTime() - changeTime > 11
     then
@@ -48,7 +49,7 @@ entity.onMobFight = function(mob, player, target)
         mob:setDamage(140)
     -- bigger
     elseif
-        delay < os.time() and
+        delay < GetSystemTime() and
         mob:getAnimationSub() == 5 and
         mob:getBattleTime() - changeTime > 11
     then
@@ -59,7 +60,7 @@ entity.onMobFight = function(mob, player, target)
         mob:setDamage(150)
     -- biggest
     elseif
-        delay < os.time() and
+        delay < GetSystemTime() and
         mob:getAnimationSub() == 6 and
         mob:getBattleTime() - changeTime > 11
     then
@@ -69,7 +70,7 @@ entity.onMobFight = function(mob, player, target)
         mob:setDamage(160)
     -- self-destruct
     elseif
-        delay < os.time() and
+        delay < GetSystemTime() and
         mob:getAnimationSub() == 7 and
         mob:getBattleTime() - changeTime > 12
     then
@@ -86,6 +87,7 @@ entity.onMobDeath = function(mob, player, optParams)
 
     -- end BCNM
     if
+        bf and
         gameOver == 1 and
         mob:getBattleTime() - changeTime > 3
     then

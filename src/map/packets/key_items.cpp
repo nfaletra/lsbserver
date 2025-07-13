@@ -19,8 +19,6 @@
 ===========================================================================
 */
 
-#include "common/socket.h"
-
 #include <cstring>
 
 #include "entities/charentity.h"
@@ -37,8 +35,8 @@ CKeyItemsPacket::CKeyItemsPacket(CCharEntity* PChar, KEYS_TABLE KeyTable)
         return;
     }
 
-    memcpy(data + (0x04), &(PChar->keys.tables[KeyTable].keyList), 0x40);
-    memcpy(data + (0x44), &(PChar->keys.tables[KeyTable].seenList), 0x40);
+    std::memcpy(buffer_.data() + 0x04, &(PChar->keys.tables[KeyTable].keyList), 0x40);
+    std::memcpy(buffer_.data() + 0x44, &(PChar->keys.tables[KeyTable].seenList), 0x40);
 
     ref<uint8>(0x84) = KeyTable;
 }

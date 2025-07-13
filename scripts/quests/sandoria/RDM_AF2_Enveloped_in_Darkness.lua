@@ -9,13 +9,13 @@
 local crawlersID = zones[xi.zone.CRAWLERS_NEST]
 -----------------------------------
 
-local quest = Quest:new(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.ENVELOPED_IN_DARKNESS)
+local quest = Quest:new(xi.questLog.SANDORIA, xi.quest.id.sandoria.ENVELOPED_IN_DARKNESS)
 
 quest.reward =
 {
     item     = xi.item.WARLOCKS_BOOTS,
     fame     = 30,
-    fameArea = xi.quest.fame_area.SANDORIA,
+    fameArea = xi.fameArea.SANDORIA,
 }
 
 quest.sections =
@@ -23,10 +23,10 @@ quest.sections =
     -- Section: Quest available.
     {
         check = function(player, status, vars)
-            return status == QUEST_AVAILABLE and
-                player:getQuestStatus(xi.quest.log_id.SANDORIA, xi.quest.id.sandoria.THE_CRIMSON_TRIAL) == QUEST_COMPLETED and
+            return status == xi.questStatus.QUEST_AVAILABLE and
+                player:getQuestStatus(xi.questLog.SANDORIA, xi.quest.id.sandoria.THE_CRIMSON_TRIAL) == xi.questStatus.QUEST_COMPLETED and
                 player:getMainJob() == xi.job.RDM and
-                player:getMainLvl() >= 50
+                player:getMainLvl() >= xi.settings.main.AF2_QUEST_LEVEL
         end,
 
         [xi.zone.CHATEAU_DORAGUILLE] =
@@ -71,7 +71,7 @@ quest.sections =
     -- Section: Quest accepted
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED
+            return status == xi.questStatus.QUEST_ACCEPTED
         end,
 
         [xi.zone.CHATEAU_DORAGUILLE] =
@@ -105,7 +105,7 @@ quest.sections =
                 onTrigger = function(player, npc)
                     if quest:getVar(player, 'Prog') >= 2 then
                         if quest:getVar(player, 'Time') > 0 then
-                            if quest:getVar(player, 'Time') <= os.time() then
+                            if quest:getVar(player, 'Time') <= GetSystemTime() then
                                 return quest:progressEvent(5) -- Quest complete.
                             else
                                 return quest:messageSpecial(crawlersID.text.EQUIPMENT_NOT_PURIFIED) -- Purification incomplete.
@@ -129,7 +129,7 @@ quest.sections =
                 [4] = function(player, csid, option, npc)
                     if option == 1 then
                         -- Set purification time.
-                        quest:setVar(player, 'Time', os.time() + 30)
+                        quest:setVar(player, 'Time', GetSystemTime() + 30)
 
                         -- Delete Key items.
                         player:delKeyItem(xi.ki.CRAWLER_BLOOD)

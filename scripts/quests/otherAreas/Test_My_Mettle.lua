@@ -2,7 +2,7 @@
 -- Test My Mettle
 -----------------------------------
 -- Log ID: 4, Quest ID: 25
--- Devean : !pos -58 -10 6 248
+-- Devean : !pos 39.86 -14.56 40 248
 -- Jar    : !gotoname Jar
 -----------------------------------
 require('scripts/quests/otherAreas/helpers')
@@ -10,12 +10,12 @@ require('scripts/quests/otherAreas/helpers')
 local selbinaID = zones[xi.zone.SELBINA]
 -----------------------------------
 
-local quest = Quest:new(xi.quest.log_id.OTHER_AREAS, xi.quest.id.otherAreas.TEST_MY_METTLE)
+local quest = Quest:new(xi.questLog.OTHER_AREAS, xi.quest.id.otherAreas.TEST_MY_METTLE)
 
 quest.reward =
 {
     fame     = 30,
-    fameArea = xi.quest.fame_area.SELBINA_RABAO,
+    fameArea = xi.fameArea.SELBINA_RABAO,
 }
 
 local betAmounts =
@@ -48,11 +48,11 @@ quest.sections =
 {
     {
         check = function(player, status, vars)
-            return status ~= QUEST_ACCEPTED and
+            return status ~= xi.questStatus.QUEST_ACCEPTED and
                 player:getMainLvl() >= 10 and
                 player:getRank(player:getNation()) >= 2 and
-                player:getFameLevel(xi.quest.fame_area.SELBINA_RABAO) >= 2 and
-                quest:getVar(player, 'Repeat') <= os.time()
+                player:getFameLevel(xi.fameArea.SELBINA_RABAO) >= 2 and
+                quest:getVar(player, 'Repeat') <= GetSystemTime()
         end,
 
         [xi.zone.SELBINA] =
@@ -71,11 +71,11 @@ quest.sections =
                             player:delGil(betAmount)
 
                             -- One Vana'diel Hour is equal to 2m24s (144s)
-                            quest:setVar(player, 'Timer', os.time() + vanaHoursRemaining * 144)
+                            quest:setVar(player, 'Timer', GetSystemTime() + vanaHoursRemaining * 144)
                             quest:setVar(player, 'Reward', betAmount * rewardMultiplier[vanaHoursRemaining])
                             quest:begin(player)
                         else
-                            return quest:messageSpecial(selbinaID.text.DONT_HAVE_ENOUGH_GIL)
+                            player:messageSpecial(selbinaID.text.DONT_HAVE_ENOUGH_GIL)
                         end
                     end
                 end,
@@ -85,7 +85,7 @@ quest.sections =
 
     {
         check = function(player, status, vars)
-            return status == QUEST_ACCEPTED
+            return status == xi.questStatus.QUEST_ACCEPTED
         end,
 
         [xi.zone.SELBINA] =
@@ -94,7 +94,7 @@ quest.sections =
             {
                 onTrade = function(player, npc, trade)
                     if npcUtil.tradeHasExactly(trade, xi.item.POWER_SANDALS) then
-                        local timeRemaining = quest:getVar(player, 'Timer') - os.time()
+                        local timeRemaining = quest:getVar(player, 'Timer') - GetSystemTime()
 
                         if timeRemaining > 0 then
                             return quest:progressEvent(122)
@@ -105,7 +105,7 @@ quest.sections =
                 end,
 
                 onTrigger = function(player, npc)
-                    local timeRemaining = quest:getVar(player, 'Timer') - os.time()
+                    local timeRemaining = quest:getVar(player, 'Timer') - GetSystemTime()
 
                     if timeRemaining > 0 then
                         local hoursRemaining = math.floor(timeRemaining / 144)

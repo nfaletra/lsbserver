@@ -7,6 +7,7 @@
 local ID = zones[xi.zone.MONASTIC_CAVERN]
 mixins = { require('scripts/mixins/job_special') }
 -----------------------------------
+---@type TMobEntity
 local entity = {}
 
 entity.onMobInitialize = function(mob)
@@ -40,7 +41,7 @@ entity.onMobDespawn = function(mob)
         local kills       = GetServerVariable('[PH]Overlord_Bakgodek')
         local popNow      = math.random(1, 5) == 3 or kills > 6
 
-        if os.time() > timeOfDeath and popNow then
+        if GetSystemTime() > timeOfDeath and popNow then
             DisallowRespawn(nqId, true)
             DisallowRespawn(hqId, false)
             UpdateNMSpawnPoint(hqId)

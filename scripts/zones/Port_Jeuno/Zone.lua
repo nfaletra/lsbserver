@@ -1,6 +1,7 @@
 -----------------------------------
 -- Zone: Port_Jeuno (246)
 -----------------------------------
+---@type TZone
 local zoneObject = {}
 
 zoneObject.onInitialize = function(zone)
@@ -9,8 +10,8 @@ end
 
 zoneObject.onZoneIn = function(player, prevZone)
     local cs = -1
-    local month = tonumber(os.date('%m'))
-    local day = tonumber(os.date('%d'))
+    local month = JstMonth()
+    local day = JstDayOfTheMonth()
 
     -- Retail start/end dates vary, set to Dec 5th through Jan 5th.
     if
@@ -48,7 +49,7 @@ zoneObject.onZoneIn = function(player, prevZone)
 end
 
 zoneObject.onConquestUpdate = function(zone, updatetype, influence, owner, ranking, isConquestAlliance)
-    xi.conq.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
+    xi.conquest.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
 end
 
 zoneObject.onTransportEvent = function(player, transport)

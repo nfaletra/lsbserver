@@ -3,17 +3,15 @@
 -----------------------------------
 local ID = zones[xi.zone.KUFTAL_TUNNEL]
 -----------------------------------
+---@type TZone
 local zoneObject = {}
 
 zoneObject.onInitialize = function(zone)
-    UpdateNMSpawnPoint(ID.mob.GUIVRE)
-    GetMobByID(ID.mob.GUIVRE):setRespawnTime(math.random(900, 10800))
-
     xi.treasure.initZone(zone)
 end
 
 zoneObject.onConquestUpdate = function(zone, updatetype, influence, owner, ranking, isConquestAlliance)
-    xi.conq.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
+    xi.conquest.onConquestUpdate(zone, updatetype, influence, owner, ranking, isConquestAlliance)
 end
 
 zoneObject.onZoneIn = function(player, prevZone)
@@ -97,6 +95,7 @@ zoneObject.onGameHour = function(zone)
         local boulder = GetNPCByID(ID.npc.DOOR_ROCK)
 
         if
+            boulder and
             isInRange(VanadielMoonPhase(), phaseInfo) and
             boulder:getAnimation() == xi.anim.CLOSE_DOOR
         then

@@ -19,8 +19,6 @@
 ===========================================================================
 */
 
-#include "common/socket.h"
-
 #include <cstring>
 
 #include "bazaar_confirmation.h"
@@ -37,7 +35,7 @@ CBazaarConfirmationPacket::CBazaarConfirmationPacket(CCharEntity* PChar, uint8 S
     ref<uint8>(0x08)  = Quantity;
     ref<uint8>(0x20)  = SlotID;
 
-    memcpy(data + (0x10), PChar->getName().c_str(), PChar->getName().size());
+    std::memcpy(buffer_.data() + 0x10, PChar->getName().c_str(), PChar->getName().size());
 }
 
 CBazaarConfirmationPacket::CBazaarConfirmationPacket(CCharEntity* PChar, CItem* PItem)
@@ -51,5 +49,5 @@ CBazaarConfirmationPacket::CBazaarConfirmationPacket(CCharEntity* PChar, CItem* 
         ref<uint16>(0x08) = PItem->getID();
     }
 
-    memcpy(data + (0x0A), PChar->getName().c_str(), PChar->getName().size());
+    std::memcpy(buffer_.data() + 0x0A, PChar->getName().c_str(), PChar->getName().size());
 }

@@ -114,7 +114,8 @@ bool CLatentEffect::ModOnItemOnly(Mod modID)
         modID == Mod::ITEM_ADDEFFECT_ELEMENT ||
         modID == Mod::ITEM_ADDEFFECT_STATUS ||
         modID == Mod::ITEM_ADDEFFECT_POWER ||
-        modID == Mod::ITEM_ADDEFFECT_DURATION)
+        modID == Mod::ITEM_ADDEFFECT_DURATION ||
+        modID == Mod::MOVE_SPEED_GEAR_BONUS)
     {
         return true;
     }
@@ -168,7 +169,7 @@ bool CLatentEffect::Deactivate()
         }
 
         m_Activated = false;
-        // printf("LATENT DEACTIVATED: %d\n", m_ModValue);
+        // printf("LATENT DEACTIVATED: %d", m_ModValue);
         return true;
     }
     return false;

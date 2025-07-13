@@ -7,6 +7,7 @@
 --  Range: 15' radial
 --  Notes: Has additional effect of Poison when used by King Vinegarroon.
 -----------------------------------
+---@type TMobSkill
 local mobskillObject = {}
 
 local platoonScorpionPoolID  = 3157
@@ -19,9 +20,9 @@ end
 mobskillObject.onMobWeaponSkill = function(target, mob, skill)
     local numhits = 1
     local accmod = 1
-    local dmgmod = 2.1
+    local ftp    = 2.1
 
-    local info = xi.mobskills.mobPhysicalMove(mob, target, skill, numhits, accmod, dmgmod, xi.mobskills.magicalTpBonus.NO_EFFECT)
+    local info = xi.mobskills.mobPhysicalMove(mob, target, skill, numhits, accmod, ftp, xi.mobskills.physicalTpBonus.NO_EFFECT)
     if mob:getPool() == platoonScorpionPoolID then
         -- should not have to verify because platoon scorps only in battlefield
         local numScorpsDead = mob:getBattlefield():getLocalVar('[ODS]NumScorpsDead')

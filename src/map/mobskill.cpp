@@ -25,14 +25,16 @@
 CMobSkill::CMobSkill(uint16 id)
 : m_ID(id)
 , m_TotalTargets(1)
+, m_primaryTargetID(0)
 , m_Param(0)
 , m_AnimID(0)
 , m_Aoe(0)
+, m_AoeRadius(0)
 , m_Distance(0)
 , m_Flag(0)
 , m_ValidTarget(0)
-, m_AnimationTime(0)
-, m_ActivationTime(0)
+, m_AnimationTime(0s)
+, m_ActivationTime(0s)
 , m_Message(0)
 , m_TP(0)
 , m_HPP(0)
@@ -50,12 +52,17 @@ bool CMobSkill::hasMissMsg() const
 
 bool CMobSkill::isAoE() const
 {
+    // 0 -> single target
+    // 1 -> AOE around mob
+    // 2 -> AOE around target
     return m_Aoe > 0 && m_Aoe < 4;
 }
 
 bool CMobSkill::isConal() const
 {
-    return m_Aoe == 4;
+    // 4 -> Conal
+    // 8 -> Conal from mob centered on target
+    return m_Aoe == 4 || m_Aoe == 8;
 }
 
 bool CMobSkill::isSingle() const
@@ -96,9 +103,19 @@ void CMobSkill::setMsg(uint16 msg)
     m_Message = msg;
 }
 
+void CMobSkill::setTargets(const std::vector<CBattleEntity*>& targets)
+{
+    m_Targets = targets;
+}
+
 void CMobSkill::setTotalTargets(uint16 targets)
 {
     m_TotalTargets = targets;
+}
+
+void CMobSkill::setPrimaryTargetID(uint32 targid)
+{
+    m_primaryTargetID = targid;
 }
 
 void CMobSkill::setAnimationID(uint16 animID)
@@ -119,6 +136,11 @@ void CMobSkill::setName(const std::string& name)
 void CMobSkill::setAoe(uint8 aoe)
 {
     m_Aoe = aoe;
+}
+
+void CMobSkill::setAoeRadius(float aoeRadius)
+{
+    m_AoeRadius = aoeRadius;
 }
 
 void CMobSkill::setDistance(float distance)
@@ -142,12 +164,12 @@ void CMobSkill::setHPP(uint8 hpp)
     m_HPP = hpp;
 }
 
-void CMobSkill::setAnimationTime(uint16 AnimationTime)
+void CMobSkill::setAnimationTime(timer::duration AnimationTime)
 {
     m_AnimationTime = AnimationTime;
 }
 
-void CMobSkill::setActivationTime(uint16 ActivationTime)
+void CMobSkill::setActivationTime(timer::duration ActivationTime)
 {
     m_ActivationTime = ActivationTime;
 }
@@ -167,53 +189,6 @@ uint16 CMobSkill::getAnimationID() const
     return m_AnimID;
 }
 
-uint16 CMobSkill::getPetAnimationID() const
-{
-    // garuda
-    if (m_AnimID >= 565 && m_AnimID <= 573)
-    {
-        return m_AnimID - 485;
-    }
-
-    // titan
-    if (m_AnimID >= 539 && m_AnimID <= 547)
-    {
-        return m_AnimID - 491;
-    }
-
-    // ifrit
-    if (m_AnimID >= 526 && m_AnimID <= 534)
-    {
-        return m_AnimID - 494;
-    }
-
-    // fenrir
-    if (m_AnimID >= 513 && m_AnimID <= 521)
-    {
-        return m_AnimID - 497;
-    }
-
-    // shiva
-    if (m_AnimID >= 578 && m_AnimID <= 586)
-    {
-        return m_AnimID - 482;
-    }
-
-    // rumah
-    if (m_AnimID >= 591 && m_AnimID <= 599)
-    {
-        return m_AnimID - 479;
-    }
-
-    // wyvern
-    if (m_AnimID >= 621 && m_AnimID <= 632)
-    {
-        return m_AnimID - 493;
-    }
-
-    return m_AnimID;
-}
-
 int16 CMobSkill::getTP() const
 {
     return m_TP;
@@ -225,9 +200,19 @@ uint8 CMobSkill::getHPP() const
     return m_HPP;
 }
 
+auto CMobSkill::getTargets() const -> const std::vector<CBattleEntity*>&
+{
+    return m_Targets;
+}
+
 uint16 CMobSkill::getTotalTargets() const
 {
     return m_TotalTargets;
+}
+
+uint32 CMobSkill::getPrimaryTargetID() const
+{
+    return m_primaryTargetID;
 }
 
 uint16 CMobSkill::getMsg() const
@@ -300,13 +285,20 @@ float CMobSkill::getDistance() const
 
 float CMobSkill::getRadius() const
 {
-    if (m_Aoe == 2)
+    // Lets check if the radius is 0 to default the values if the skill is AOE and the radius is still set to 0
+    if (m_AoeRadius <= 0)
     {
-        // centered around target, usually 8'
-        return 8.0f;
+        if (m_Aoe == 2) // If its a targeted AOE skill
+        {
+            return 8; // Keep the original 8 radius as defaulted
+        }
+        else
+        {
+            return m_Distance; // Return the base distance check as default
+        }
     }
 
-    return m_Distance;
+    return m_AoeRadius;
 }
 
 int16 CMobSkill::getParam() const
@@ -339,12 +331,12 @@ uint16 CMobSkill::getValidTargets() const
     return m_ValidTarget;
 }
 
-uint16 CMobSkill::getAnimationTime() const
+timer::duration CMobSkill::getAnimationTime() const
 {
     return m_AnimationTime;
 }
 
-uint16 CMobSkill::getActivationTime() const
+timer::duration CMobSkill::getActivationTime() const
 {
     return m_ActivationTime;
 }

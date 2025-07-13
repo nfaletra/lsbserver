@@ -19,7 +19,6 @@
 ===========================================================================
 */
 
-#include "common/socket.h"
 #include "common/utils.h"
 
 #include "guild_menu.h"
@@ -36,7 +35,7 @@ CGuildMenuPacket::CGuildMenuPacket(GUILDSTATUS status, uint8 open, uint8 close, 
         case GUILD_OPEN:
         case GUILD_CLOSE:
         {
-            packBitsBE(data + (0x08), 0xFFFFFF, open, close - open);
+            packBitsBE(buffer_.data() + 0x08, 0xFFFFFF, open, close - open);
         }
         break;
         case GUILD_HOLYDAY:
